@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Кот на крышах</title>
+<meta name="description" content="Ночной платформер: кот бежит по крышам, спасает друзей и сражается с Королём Теней.">
+<meta name="theme-color" content="#120e2b">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik+Mono+One&family=Rubik:wght@400;500;700&display=swap">
+<style>
+/* Полноэкранная сцена; HUD, меню и сенсорные кнопки лежат поверх неё. Ночная гамма — единственная тема, это часть мира игры. */
+:root{
+  --night:#120e2b;--night-2:#1e1744;--panel:rgba(26,19,64,.9);--panel-solid:#1d1648;--line:#3a2f78;--line-2:#4f43a0;
+  --ink:#efeaff;--muted:#a59fd1;--star:#ffd85a;--danger:#ff5d8f;--mint:#7ff7c8;--sky:#8fd0ff;
+  --display:"Rubik Mono One","Arial Black",system-ui,sans-serif;--body:"Rubik",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none}
+body{background:var(--night);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;touch-action:manipulation}
+button{font:inherit;color:inherit}
+.stage{position:fixed;inset:0;overflow:hidden;background:radial-gradient(120% 80% at 50% 0%,var(--night-2),var(--night) 70%)}
+canvas{display:block;width:100%;height:100%;touch-action:none}
+[hidden]{display:none!important}
+.safe{padding:max(12px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+
+/* HUD */
+.hud{position:absolute;inset:0 0 auto 0;display:flex;justify-content:space-between;align-items:flex-start;gap:8px;pointer-events:none;padding-bottom:0}
+.hud .grp{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.chip{background:rgba(18,12,48,.72);border:1px solid var(--line);border-radius:999px;padding:4px 11px;font-size:14px;font-variant-numeric:tabular-nums;display:inline-flex;gap:6px;align-items:center;backdrop-filter:blur(4px)}
+.chip b{font-weight:700}
+.chip .s{color:var(--star)}
+.hearts{color:var(--danger);letter-spacing:1px;font-size:16px}
+.shieldchip{color:var(--mint)}
+.abil{display:flex;gap:4px}
+.abil span{width:26px;height:26px;border-radius:8px;background:rgba(18,12,48,.72);border:1px solid var(--line);display:grid;place-items:center;font-size:13px;color:var(--star)}
+.ib{pointer-events:auto;width:38px;height:38px;border-radius:12px;border:1px solid var(--line-2);background:rgba(18,12,48,.8);cursor:pointer;font-weight:700;display:grid;place-items:center}
+.ib:hover{background:#2e2468}
+.combo{position:absolute;left:50%;top:max(54px,calc(env(safe-area-inset-top) + 48px));transform:translateX(-50%);font-family:var(--display);font-size:clamp(16px,3vw,26px);color:#ff8fd0;text-shadow:0 0 14px rgba(255,93,200,.7),0 2px 0 #3a0a30;pointer-events:none;opacity:0;transition:opacity .15s}
+.combo.on{opacity:1;animation:pulse .35s ease}
+.bossbar{position:absolute;left:50%;transform:translateX(-50%);bottom:max(18px,env(safe-area-inset-bottom));width:min(520px,80vw);text-align:center;pointer-events:none}
+.bossbar .nm{font-family:var(--display);font-size:13px;letter-spacing:.06em;color:#ffb0d8;text-shadow:0 2px 0 #000}
+.bossbar .bar{height:12px;border-radius:999px;background:rgba(10,6,28,.85);border:1px solid #6a2a5a;overflow:hidden;margin-top:4px}
+.bossbar i{display:block;height:100%;background:linear-gradient(90deg,#ff5d8f,#d88aff);transition:width .3s}
+.flash{position:absolute;inset:0;pointer-events:none;background:#ff5d8f;opacity:0;transition:opacity .25s}
+.flash.w{background:#fff}
+#fx{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.pop{position:absolute;transform:translate(-50%,-50%);font-weight:700;font-size:14px;text-shadow:0 2px 0 rgba(0,0,0,.6);animation:rise .9s ease-out forwards;white-space:nowrap}
+.pop.big{font-family:var(--display);font-size:18px}
+@keyframes rise{0%{opacity:0;transform:translate(-50%,-30%) scale(.6)}15%{opacity:1;transform:translate(-50%,-60%) scale(1.15)}100%{opacity:0;transform:translate(-50%,-260%) scale(1)}}
+@keyframes pulse{0%{transform:translateX(-50%) scale(1.5)}100%{transform:translateX(-50%) scale(1)}}
+.banner{position:absolute;left:50%;top:30%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;opacity:0}
+.banner.on{animation:banner 2.2s ease forwards}
+.banner h3{font-family:var(--display);font-weight:400;font-size:clamp(22px,5vw,44px);margin:0;color:var(--star);text-shadow:0 0 24px rgba(255,216,90,.5),0 3px 0 #2a1a00;text-wrap:balance}
+.banner p{margin:4px 0 0;color:var(--ink);font-size:15px;text-shadow:0 2px 0 #000}
+@keyframes banner{0%{opacity:0;transform:translate(-50%,-50%) scale(.7)}12%{opacity:1;transform:translate(-50%,-50%) scale(1.05)}20%{transform:translate(-50%,-50%) scale(1)}80%{opacity:1}100%{opacity:0}}
+.toast{position:absolute;left:50%;bottom:max(96px,calc(env(safe-area-inset-bottom) + 90px));transform:translateX(-50%);background:var(--panel);border:1px solid var(--line-2);border-radius:12px;padding:8px 14px;font-size:14px;pointer-events:none;opacity:0;transition:opacity .25s,transform .25s;white-space:nowrap;max-width:90vw;overflow:hidden;text-overflow:ellipsis}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(-6px)}
+
+/* Экраны и панели */
+.screen{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:5}
+.dim{background:rgba(8,5,24,.62);backdrop-filter:blur(3px)}
+.card{background:var(--panel);border:1px solid var(--line-2);border-radius:18px;padding:22px 22px 20px;max-width:min(460px,92vw);max-height:90dvh;overflow:auto;text-align:center;display:flex;flex-direction:column;gap:10px;align-items:center;box-shadow:0 30px 80px -20px #000}
+.card h2{font-family:var(--display);font-weight:400;font-size:clamp(18px,4.4vw,26px);margin:0;color:var(--star);text-wrap:balance;line-height:1.2}
+.card p{margin:0}
+.sub{color:var(--muted);font-size:13px}
+.row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.btn{font-family:var(--display);font-size:13px;letter-spacing:.04em;background:var(--star);color:#241a00;border:0;border-radius:10px;padding:11px 20px;cursor:pointer;min-height:44px}
+.btn:hover{filter:brightness(1.08)}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line-2)}
+.btn.ghost:hover{background:#2a2160}
+.btn.sm{font-size:11px;padding:8px 12px;min-height:36px}
+.btn[disabled]{opacity:.45;cursor:default;filter:none}
+button:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+kbd{font-family:var(--body);background:#231b4f;border:1px solid #4a3f8a;border-bottom-width:3px;border-radius:5px;padding:0 6px;font-size:12px}
+
+.title{flex-direction:column;gap:14px;text-align:center;padding:24px}
+.logo{font-family:var(--display);font-size:clamp(30px,8vw,72px);line-height:1;margin:0;text-shadow:0 0 40px rgba(255,216,90,.35),0 5px 0 #2a1a5a;text-wrap:balance}
+.logo span{color:var(--star)}
+.tag{color:var(--muted);max-width:34ch;margin:0 auto}
+
+/* Дом */
+.hubui{position:absolute;inset:0;display:flex;flex-direction:column;pointer-events:none}
+.hubtop{display:flex;justify-content:space-between;align-items:center;gap:8px;pointer-events:auto}
+.hubtop h1{font-family:var(--display);font-weight:400;font-size:clamp(14px,2.6vw,20px);margin:0}
+.hubtop h1 span{color:var(--star)}
+.sheet{pointer-events:auto;position:absolute;right:max(12px,env(safe-area-inset-right));top:max(64px,calc(env(safe-area-inset-top) + 56px));bottom:max(12px,env(safe-area-inset-bottom));width:min(460px,46vw);background:var(--panel);border:1px solid var(--line-2);border-radius:18px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 30px 80px -20px #000}
+.tabs{display:flex;gap:2px;padding:6px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+.tabs button{flex:1;min-width:max-content;background:none;border:0;border-radius:10px;padding:9px 10px;cursor:pointer;color:var(--muted);font-weight:500;font-size:13px;white-space:nowrap}
+.tabs button.on{background:#2f2570;color:var(--ink)}
+.pane{flex:1;overflow:auto;padding:14px;-webkit-user-select:none}
+.pane h3{font-family:var(--display);font-weight:400;font-size:13px;letter-spacing:.04em;margin:4px 0 8px;color:var(--star)}
+.pane .sub{margin:-4px 0 10px}
+@media (max-width:760px),(max-height:520px) and (orientation:landscape){
+  .sheet{left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));width:auto;top:auto;height:58dvh}
+}
+@media (max-height:520px) and (orientation:landscape){.sheet{left:auto;width:min(440px,56vw);top:max(54px,env(safe-area-inset-top));height:auto}}
+
+.world{margin-bottom:16px}
+.nodes{display:flex;align-items:flex-start;gap:6px;position:relative;padding:4px 0}
+.node{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:0;cursor:pointer;padding:4px 0;border-radius:12px;min-width:0}
+.node .o{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;background:#2a2160;border:2px solid var(--line-2);font-weight:700;font-size:13px;position:relative}
+.node.boss .o{border-radius:14px;background:#3a1745;border-color:#a04a8a;font-size:20px}
+.node.done .o{background:#3a3070;border-color:var(--star)}
+.node.next .o{border-color:var(--star);box-shadow:0 0 0 4px rgba(255,216,90,.18);animation:glow 1.6s ease-in-out infinite}
+.node.lock{cursor:default;opacity:.5}
+.node .st{font-size:12px;letter-spacing:1px;color:var(--star);min-height:16px}
+.node .st .off{color:#4a4280}
+.node .nm{font-size:11px;color:var(--muted);text-align:center;line-height:1.2;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.node .fish{position:absolute;right:-6px;top:-4px;font-size:12px}
+@keyframes glow{50%{box-shadow:0 0 0 8px rgba(255,216,90,.06)}}
+
+.cats{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.cats button{background:#241c55;border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer;font-size:13px}
+.cats button.on{background:var(--star);color:#241a00;border-color:var(--star)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:8px}
+.item{background:#211a50;border:1px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:6px;cursor:pointer;text-align:left}
+.item.sel{border-color:var(--star)}
+.item .sw{height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px}
+.item .n{font-weight:500;font-size:13px}
+.item .p{font-size:12px;color:var(--muted)}
+.item .p.own{color:var(--mint)}
+.buybar{position:sticky;bottom:-14px;margin:12px -14px -14px;padding:12px 14px;background:var(--panel-solid);border-top:1px solid var(--line);display:flex;gap:8px;align-items:center;justify-content:space-between}
+
+.friend{display:flex;gap:12px;align-items:flex-start;background:#211a50;border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px}
+.friend .av{flex:none;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:#33297a;font-size:18px;color:var(--star)}
+.friend b{display:block}
+.friend.locked{opacity:.55}
+.friend .q{font-size:13px;color:var(--muted);margin-top:2px}
+.ch{background:#211a50;border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:10px;display:flex;flex-direction:column;gap:6px}
+.ch .row{justify-content:flex-start}
+.kv{display:flex;justify-content:space-between;gap:10px;font-size:14px;padding:6px 0;border-bottom:1px solid var(--line)}
+.kv:last-child{border:0}
+.toggle{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.sw2{width:44px;height:26px;border-radius:999px;background:#3a3070;position:relative;flex:none;transition:background .2s}
+.sw2::after{content:"";position:absolute;left:3px;top:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .2s}
+.sw2.on{background:var(--mint)}
+.sw2.on::after{left:21px}
+
+.rate{display:flex;gap:10px;justify-content:center;font-size:40px;line-height:1}
+.rate span{color:#3a3070;transform:scale(.4);opacity:0;transition:transform .35s cubic-bezier(.3,1.8,.5,1),opacity .2s,color .2s}
+.rate span.in{opacity:1;transform:scale(1)}
+.rate span.got{color:var(--star);text-shadow:0 0 18px rgba(255,216,90,.6)}
+.goals{font-size:13px;text-align:left;display:flex;flex-direction:column;gap:3px}
+.goals .y{color:var(--star)}
+.goals .n{color:var(--muted)}
+.portrait{width:84px;height:84px;border-radius:50%;background:radial-gradient(circle,#4a3c9a,#241c55);display:grid;place-items:center;font-size:40px;color:var(--star);box-shadow:0 0 40px rgba(255,216,90,.3)}
+
+/* Сенсорное управление */
+.pad{position:absolute;inset:auto 0 0 0;display:none;justify-content:space-between;align-items:flex-end;padding:0 max(14px,env(safe-area-inset-right)) max(14px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));pointer-events:none;z-index:3}
+.pad .g{display:flex;gap:12px;align-items:flex-end;pointer-events:auto}
+.pad button{width:68px;height:68px;border-radius:50%;border:2px solid rgba(160,140,255,.45);background:rgba(30,22,70,.55);color:var(--ink);font-size:24px;touch-action:none;backdrop-filter:blur(3px)}
+.pad button.on{background:rgba(90,70,190,.7)}
+.pad .jump{width:84px;height:84px;background:rgba(255,216,90,.85);color:#241a00;border-color:var(--star);font-size:13px;font-weight:700}
+.pad .jump.on{background:#e0b840}
+.pad .act{width:56px;height:56px;font-size:12px;font-weight:700}
+.pad .col{display:flex;flex-direction:column;gap:10px}
+@media (pointer:coarse){.pad.show{display:flex}.desk{display:none}}
+.desk{color:var(--muted);font-size:12px}
+.rotate{display:none}
+@media (pointer:coarse) and (orientation:portrait){.rotate.show{display:block}}
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <canvas id="c" aria-label="Игровое поле"></canvas>
+  <div id="fx"></div>
+  <div class="flash" id="flash"></div>
+  <div class="hud safe" id="hud" hidden>
+    <div class="grp">
+      <span class="chip"><span class="hearts" id="hLives"></span><span class="shieldchip" id="hShield" hidden>✷</span></span>
+      <span class="chip"><span class="s">★</span><b id="hStars">0/0</b></span>
+      <span class="chip"><b id="hScore">0</b></span>
+    </div>
+    <div class="grp">
+      <span class="chip" id="hTimeChip"><b id="hTime">0:00</b></span>
+      <span class="abil" id="hAbil"></span>
+      <button class="ib" id="bPause" aria-label="Пауза">❚❚</button>
+    </div>
+  </div>
+  <div class="combo" id="hCombo"></div>
+  <div class="bossbar" id="bossbar" hidden><div class="nm" id="bossName"></div><div class="bar"><i id="bossHp" style="width:100%"></i></div></div>
+  <div class="banner" id="banner"><h3 id="bannerH"></h3><p id="bannerP"></p></div>
+  <div class="toast" id="toast"></div>
+  <div class="pad" id="pad">
+    <div class="g"><button id="tL" aria-label="Влево">◀</button><button id="tR" aria-label="Вправо">▶</button></div>
+    <div class="g">
+      <div class="col"><button class="act" id="tPaw" aria-label="Удар лапой" hidden>ЛАПА</button><button class="act" id="tDash" aria-label="Перекат" hidden>РЫВОК</button></div>
+      <button class="jump" id="tJ" aria-label="Прыжок">ПРЫЖОК</button>
+    </div>
+  </div>
+  <div class="screen" id="screen"></div>
+</div>
+<script src="vendor/three.min.js"></script>
+<script src="js/data.js"></script>
+<script src="js/levels.js"></script>
+<script src="js/core.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/render.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

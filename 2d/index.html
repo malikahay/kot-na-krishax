@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Кот на крышах</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik+Mono+One&family=Rubik:wght@400;500;700&display=swap">
+<style>
+/* Layout: one centered play column — HUD strip, pixel canvas, touch pad. Night-rooftop world, single dark look by choice. */
+:root{
+  --night:#120e2b;
+  --night-2:#1e1744;
+  --panel:#231b4f;
+  --ink:#efeaff;
+  --muted:#a59fd1;
+  --star:#ffd85a;
+  --cat:#f2873a;
+  --danger:#ff5d8f;
+  --display:"Rubik Mono One","Arial Black",system-ui,sans-serif;
+  --body:"Rubik",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  background:radial-gradient(120% 80% at 50% 0%,var(--night-2),var(--night) 70%);
+  background-color:var(--night);
+  color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:20px 28px;
+  -webkit-tap-highlight-color:transparent;
+}
+.wrap{max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font-family:var(--display);font-weight:400;font-size:clamp(20px,4vw,30px);margin:0;letter-spacing:.02em;text-wrap:balance}
+h1 span{color:var(--star)}
+.hint{color:var(--muted);font-size:13px;margin:0}
+.hud{display:flex;gap:8px;flex-wrap:wrap}
+.chip{background:var(--panel);border:1px solid #3a2f78;border-radius:999px;padding:4px 12px;font-size:13px;font-variant-numeric:tabular-nums;display:flex;gap:6px;align-items:center}
+.chip b{font-weight:700}
+.chip .lbl{color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-size:11px}
+.hearts{color:var(--danger);letter-spacing:2px}
+.stage{position:relative;width:100%;aspect-ratio:384/208;max-width:100%;border-radius:10px;overflow:hidden;box-shadow:0 0 0 1px #3a2f78,0 20px 60px -20px #000}
+canvas{display:block;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges;background:var(--night)}
+.overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,7,28,.72);backdrop-filter:blur(2px);padding:16px}
+.card{text-align:center;max-width:420px;display:flex;flex-direction:column;gap:10px;align-items:center}
+.card h2{font-family:var(--display);font-weight:400;font-size:clamp(18px,4.4vw,28px);margin:0;color:var(--star);text-wrap:balance}
+.card p{margin:0;color:var(--ink);font-size:14px}
+.card .sub{color:var(--muted);font-size:13px}
+button.play{font-family:var(--display);font-size:14px;letter-spacing:.04em;background:var(--star);color:#241a00;border:0;border-radius:8px;padding:10px 22px;cursor:pointer;margin-top:4px}
+button.play:hover{filter:brightness(1.08)}
+button:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+.keys{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;font-size:12px;color:var(--muted)}
+kbd{font-family:var(--body);background:var(--panel);border:1px solid #4a3f8a;border-bottom-width:3px;border-radius:5px;padding:1px 6px;color:var(--ink)}
+.pad{display:none;justify-content:space-between;gap:12px;user-select:none;-webkit-user-select:none;touch-action:none}
+.pad .grp{display:flex;gap:12px}
+.pad button{width:72px;height:72px;border-radius:50%;border:2px solid #4a3f8a;background:var(--panel);color:var(--ink);font-size:26px;font-family:var(--body);touch-action:none}
+.pad button.on{background:#3a2f78}
+.pad button.jump{background:var(--star);color:#241a00;border-color:var(--star);font-size:14px;font-weight:700}
+.pad button.jump.on{filter:brightness(.85)}
+@media (pointer:coarse){.pad{display:flex}.desk{display:none}}
+footer{color:var(--muted);font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Кот на <span>крышах</span></h1>
+    <div class="hud" aria-live="polite">
+      <div class="chip"><span class="lbl">Уровень</span><b id="hLevel">1/3</b></div>
+      <div class="chip"><span class="lbl">Звёзды</span><b id="hStars">0/0</b></div>
+      <div class="chip"><span class="lbl">Очки</span><b id="hScore">0</b></div>
+      <div class="chip"><span class="hearts" id="hLives">♥♥♥</span></div>
+    </div>
+  </header>
+
+  <div class="stage">
+    <canvas id="c" width="384" height="208" aria-label="Игровое поле"></canvas>
+    <div class="overlay" id="ov">
+      <div class="card" id="card"></div>
+    </div>
+  </div>
+
+  <div class="pad" id="pad">
+    <div class="grp">
+      <button id="bL" aria-label="Влево">◀</button>
+      <button id="bR" aria-label="Вправо">▶</button>
+    </div>
+    <button id="bJ" class="jump" aria-label="Прыжок">ПРЫЖОК</button>
+  </div>
+
+  <p class="hint desk">Бег — <kbd>←</kbd> <kbd>→</kbd> или <kbd>A</kbd> <kbd>D</kbd> · прыжок — <kbd>Пробел</kbd>, <kbd>↑</kbd> или <kbd>W</kbd> · пауза — <kbd>P</kbd></p>
+</div>
+
+<script>
+(()=>{
+const T=16, W=384, H=208, ROWS=13;
+const cv=document.getElementById('c'), ctx=cv.getContext('2d');
+ctx.imageSmoothingEnabled=false;
+const C={skyTop:'#120e2b',skyBot:'#2c1f5a',moon:'#fff3c4',far:'#211a4a',mid:'#2b2260',roof:'#3d317a',roofEdge:'#8f80e0',brick:'#241b4c',brickLine:'#1a1338',win:'#ffcf6b',winOff:'#33296b',plank:'#6b4a8f',plankTop:'#b48ae0',star:'#ffd85a',cat:'#f2873a',catDark:'#b55a1e',enemy:'#0b071f',eye:'#ff5d8f',spike:'#d9d2ff',door:'#ffe9a8'};
+
+/* ---------- levels ---------- */
+function makeLevel(build){
+  const MAXW=600;
+  const g=Array.from({length:ROWS},()=>new Uint8Array(MAXW));
+  const L={w:0,g,stars:[],hearts:[],enemies:[],goal:null,start:{x:2,y:10}};
+  let O=0,maxX=0;const mark=x=>{if(x+1>maxX)maxX=x+1};
+  const api={
+    at:(x)=>{O=x},
+    ground:(a,b)=>{for(let x=O+a;x<O+b;x++){g[11][x]=1;g[12][x]=1;mark(x)}},
+    block:(x,y,w,h)=>{for(let j=y;j<y+h;j++)for(let i=O+x;i<O+x+w;i++){g[j][i]=1;mark(i)}},
+    plat:(x,y,w)=>{for(let i=O+x;i<O+x+w;i++){g[y][i]=2;mark(i)}},
+    spikes:(...xs)=>{xs.forEach(x=>g[10][O+x]=3)},
+    stars:(x,y,n=1,step=1)=>{for(let i=0;i<n;i++)L.stars.push({x:(O+x+i*step)*T+8,y:y*T+8,got:false})},
+    heart:(x,y)=>L.hearts.push({x:(O+x)*T+8,y:y*T+8,got:false}),
+    enemy:(...xs)=>{xs.forEach(x=>L.enemies.push({sx:O+x}))},
+    goal:(x)=>{L.goal={x:(O+x)*T,y:9*T,w:T,h:2*T}}
+  };
+  build(api);
+  L.w=maxX;
+  return L;
+}
+/* Reusable rooftop sections: each starts and ends on ground (row 11). Returns its width. */
+const SEC={
+  stairs:a=>{a.ground(0,4);a.plat(5,8,3);a.plat(9,5,3);a.stars(9,4,3);a.plat(13,8,3);a.ground(17,22);a.enemy(19);return 22},
+  spikeRun:a=>{a.ground(0,20);a.spikes(5,6,13,14);a.stars(5,8,2);a.stars(13,8,2);a.enemy(9);a.block(17,9,1,2);a.stars(17,8);return 20},
+  towers:a=>{a.ground(0,24);a.block(4,9,2,2);a.block(9,7,2,4);a.block(14,9,2,2);a.stars(9,6,2);a.enemy(6,18);a.stars(17,10,4);return 24},
+  pitHop:a=>{a.ground(0,3);a.plat(5,9,2);a.plat(9,9,2);a.plat(13,8,2);a.plat(17,9,2);a.ground(21,26);
+    a.stars(5,8,2);a.stars(9,8,2);a.stars(13,7,2);a.stars(17,8,2);a.enemy(23);return 26},
+  highRoad:a=>{a.ground(0,28);a.spikes(6,7,8,9,10,11,12,13,14,15);a.plat(4,8,3);a.plat(9,6,3);a.plat(14,8,3);a.stars(9,5,3);a.enemy(20,25);return 28},
+  alley:a=>{a.ground(0,22);a.enemy(5,11,16);a.stars(3,8,6,3);return 22},
+  finish:a=>{a.ground(0,14);a.stars(2,10,4,2);a.goal(10);return 14}
+};
+function chain(a,start,list){let x=start;for(const item of list){const [name,extra]=Array.isArray(item)?item:[item];a.at(x);const w=SEC[name](a);if(extra)extra(a);x+=w}}
+const LEVELS=[
+ ()=>makeLevel(a=>{
+   a.ground(0,13);a.ground(15,35);a.ground(37,53);a.ground(55,71);a.ground(73,92);
+   a.stars(3,10,3,2);
+   a.plat(6,8,4);a.stars(6,7,4);
+   a.plat(18,8,5);a.plat(24,5,4);a.stars(24,4,4);
+   a.spikes(30,31);a.enemy(20);
+   a.block(44,9,2,2);a.stars(44,8,2);a.enemy(40);
+   a.spikes(48,49);a.stars(47,8,4);
+   a.plat(58,8,3);a.plat(63,6,3);a.stars(63,5,3);a.enemy(66);
+   a.stars(75,10,6);
+   chain(a,92,['stairs','spikeRun',['towers',a=>a.heart(10,4)],'alley','pitHop','finish']);
+ }),
+ ()=>makeLevel(a=>{
+   a.ground(0,10);a.plat(12,9,2);a.stars(12,8,2);
+   a.ground(16,30);a.spikes(22,23);a.plat(21,8,4);a.stars(21,7,4);a.enemy(18,27);
+   a.ground(33,45);a.block(38,8,2,3);a.stars(38,7,2);a.enemy(35,42);
+   a.plat(47,8,2);a.stars(47,7,2);
+   a.ground(50,62);a.plat(53,7,3);a.plat(57,4,3);a.stars(57,3,3);a.spikes(58,59,60);a.enemy(55);
+   a.ground(65,80);a.enemy(68,74);a.block(77,9,1,2);a.stars(66,10,4,2);
+   a.plat(81,9,2);a.plat(85,7,2);a.plat(89,9,2);a.stars(81,8,2);a.stars(85,6,2);a.stars(89,8,2);
+   a.ground(93,110);a.enemy(98);a.spikes(101,102);
+   chain(a,110,['highRoad','towers',['pitHop',a=>a.heart(13,5)],'stairs','spikeRun','alley','finish']);
+ }),
+ ()=>makeLevel(a=>{
+   a.ground(0,14);a.plat(5,8,3);a.plat(9,5,3);a.plat(13,2,4);a.stars(13,1,4);a.stars(9,4,3);
+   a.ground(17,26);a.spikes(18,19,20);a.enemy(23);a.stars(18,8,3);
+   a.plat(27,8,2);a.stars(27,7,2);
+   a.ground(30,44);a.block(34,8,2,3);a.block(38,6,2,5);a.stars(38,5,2);a.enemy(31,42);
+   a.plat(45,9,2);a.plat(49,9,2);a.stars(45,8,2);a.stars(49,8,2);
+   a.ground(52,70);a.spikes(55,56,62,63);a.plat(55,8,2);a.plat(61,8,3);a.plat(66,5,3);a.stars(66,4,3);a.enemy(58,67);
+   a.ground(72,85);a.block(78,9,3,2);a.stars(78,8,3);a.enemy(74,82);
+   a.plat(86,9,2);a.plat(90,7,2);a.plat(94,9,2);a.stars(90,6,2);
+   a.ground(96,120);a.enemy(100,108);a.spikes(104,105);a.stars(98,10,4,3);
+   chain(a,120,['pitHop','highRoad',['stairs',a=>a.heart(10,2)],'towers','alley','spikeRun',['pitHop',a=>a.heart(13,5)],'highRoad','finish']);
+ })
+];
+
+/* ---------- state ---------- */
+let lvl, L, P, cam=0, score=0, lives=3, state='menu', particles=[], frame=0, levelScoreStart=0;
+let best=0; try{best=+localStorage.getItem('kot-best')||0}catch(e){}
+const keys={left:false,right:false,jump:false};
+let jumpBuffer=0, coyote=0, jumpHeld=false;
+
+function loadLevel(i){
+  lvl=i; L=LEVELS[i](); levelScoreStart=score;
+  L.enemies=L.enemies.map(e=>({x:e.sx*T+2,y:10*T+4,w:12,h:12,vx:-0.5,vy:0,alive:true,squash:0}));
+  P={x:L.start.x*T,y:L.start.y*T,w:12,h:14,vx:0,vy:0,face:1,onGround:false,inv:0,safe:{x:L.start.x*T,y:L.start.y*T}};
+  cam=0; particles=[]; hud();
+}
+
+/* ---------- tiles ---------- */
+const tile=(tx,ty)=> (ty<0||ty>=ROWS)?0:(tx<0||tx>=L.w)?1:L.g[ty][tx];
+const solid=(tx,ty)=>{const t=tile(tx,ty);return t===1||t===2};
+
+function moveX(e){
+  e.x+=e.vx; let hit=false;
+  const top=Math.floor(e.y/T), bot=Math.floor((e.y+e.h-0.01)/T);
+  if(e.vx>0){const tx=Math.floor((e.x+e.w)/T);for(let ty=top;ty<=bot;ty++)if(solid(tx,ty)){e.x=tx*T-e.w;e.vx=0;hit=true;break}}
+  else if(e.vx<0){const tx=Math.floor(e.x/T);for(let ty=top;ty<=bot;ty++)if(solid(tx,ty)){e.x=(tx+1)*T;e.vx=0;hit=true;break}}
+  return hit;
+}
+function moveY(e){
+  e.y+=e.vy; e.onGround=false;
+  const l=Math.floor(e.x/T), r=Math.floor((e.x+e.w-0.01)/T);
+  if(e.vy>0){const ty=Math.floor((e.y+e.h)/T);for(let tx=l;tx<=r;tx++)if(solid(tx,ty)){e.y=ty*T-e.h;e.vy=0;e.onGround=true;break}}
+  else if(e.vy<0){const ty=Math.floor(e.y/T);for(let tx=l;tx<=r;tx++)if(solid(tx,ty)){e.y=(ty+1)*T;e.vy=0;break}}
+}
+const overlap=(a,b)=>a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
+
+/* ---------- update ---------- */
+function burst(x,y,col,n=8){for(let i=0;i<n;i++){const a=Math.random()*Math.PI*2,s=.6+Math.random()*1.6;particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-1,life:30+Math.random()*15,col})}}
+
+function hurt(){
+  if(P.inv>0)return;
+  lives--; hud(); burst(P.x+6,P.y+7,C.eye,12);
+  if(lives<=0){gameOver();return}
+  P.inv=100; P.vy=-3.5; P.vx=-P.face*2;
+}
+function fell(){
+  lives--; hud();
+  if(lives<=0){gameOver();return}
+  P.x=P.safe.x;P.y=P.safe.y;P.vx=0;P.vy=0;P.inv=100;
+}
+
+function step(){
+  frame++;
+  // player input
+  const dir=(keys.right?1:0)-(keys.left?1:0);
+  if(dir){P.vx+=dir*0.28;P.face=dir}else{P.vx*=P.onGround?0.75:0.92;if(Math.abs(P.vx)<0.05)P.vx=0}
+  P.vx=Math.max(-1.9,Math.min(1.9,P.vx));
+  if(keys.jump&&!jumpHeld)jumpBuffer=8; jumpHeld=keys.jump;
+  coyote=P.onGround?6:Math.max(0,coyote-1);
+  if(jumpBuffer>0){jumpBuffer--; if(coyote>0){P.vy=-6.2;coyote=0;jumpBuffer=0;P.onGround=false}}
+  if(!keys.jump&&P.vy<-2.5)P.vy=-2.5;
+  P.vy=Math.min(7,P.vy+0.35);
+  moveX(P); moveY(P);
+  if(P.inv>0)P.inv--;
+  if(P.onGround&&P.inv===0&&frame%20===0&&!nearHazard())P.safe={x:P.x,y:P.y};
+
+  // spikes
+  const l=Math.floor((P.x+2)/T),r=Math.floor((P.x+P.w-2)/T),t=Math.floor((P.y+6)/T),b=Math.floor((P.y+P.h-1)/T);
+  for(let ty=t;ty<=b;ty++)for(let tx=l;tx<=r;tx++)if(tile(tx,ty)===3)hurt();
+  if(state!=='play')return;
+  if(P.y>H+20){fell();if(state!=='play')return}
+
+  // enemies
+  for(const e of L.enemies){
+    if(!e.alive){e.squash++;continue}
+    e.vy=Math.min(7,e.vy+0.35);
+    const v=e.vx; if(moveX(e))e.vx=-v;
+    moveY(e);
+    if(e.onGround){
+      const ahead=e.vx>0?Math.floor((e.x+e.w+1)/T):Math.floor((e.x-1)/T);
+      if(!solid(ahead,Math.floor((e.y+e.h+1)/T))||tile(ahead,Math.floor((e.y+6)/T))===3)e.vx=-e.vx;
+    }
+    if(e.vx===0)e.vx=0.5;
+    if(e.y>H+40)e.alive=false;
+    if(overlap(P,e)){
+      if(P.vy>0&&P.y+P.h-P.vy<=e.y+5){e.alive=false;P.vy=keys.jump?-6:-4.2;score+=50;burst(e.x+6,e.y+6,C.eye,10);hud()}
+      else hurt();
+      if(state!=='play')return;
+    }
+  }
+  // stars
+  for(const s of L.stars){if(!s.got&&Math.abs(P.x+6-s.x)<10&&Math.abs(P.y+7-s.y)<11){s.got=true;score+=10;burst(s.x,s.y,C.star);hud()}}
+  // hearts
+  for(const h of L.hearts){if(!h.got&&Math.abs(P.x+6-h.x)<10&&Math.abs(P.y+7-h.y)<11){h.got=true;lives=Math.min(5,lives+1);score+=25;burst(h.x,h.y,C.eye,12);hud()}}
+  // goal
+  if(L.goal&&overlap(P,L.goal)){levelDone();return}
+  // particles
+  for(const p of particles){p.x+=p.vx;p.y+=p.vy;p.vy+=0.08;p.life--}
+  particles=particles.filter(p=>p.life>0);
+  // camera
+  const target=P.x+6-W*0.42;
+  cam+=(target-cam)*0.12; cam=Math.max(0,Math.min(L.w*T-W,cam));
+}
+function nearHazard(){const tx=Math.floor((P.x+6)/T),ty=Math.floor((P.y+P.h+1)/T);
+  for(let d=-1;d<=1;d++){if(!solid(tx+d,ty)||tile(tx+d,ty-1)===3)return true}return false}
+
+/* ---------- drawing ---------- */
+function rng(seed){return()=>{seed=(seed*16807)%2147483647;return(seed-1)/2147483646}}
+const skyline=[[],[]];
+(function(){for(let layer=0;layer<2;layer++){const r=rng(7+layer*31);let x=-20;while(x<9000){const w=22+r()*40|0,h=(layer?50:30)+r()*(layer?70:60)|0;skyline[layer].push({x,w,h,wins:Array.from({length:40},()=>r()<.28)});x+=w+(r()*6|0)}}})();
+const skyStars=Array.from({length:60},(_,i)=>{const r=rng(100+i);return{x:r()*W,y:r()*110,s:r()<.2?2:1,p:r()*6}});
+
+function drawBg(){
+  const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,C.skyTop);g.addColorStop(1,C.skyBot);
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  for(const s of skyStars){ctx.globalAlpha=.4+.6*Math.abs(Math.sin(frame/50+s.p));ctx.fillStyle='#fff';ctx.fillRect(((s.x-cam*0.05)%W+W)%W|0,s.y|0,s.s,s.s)}
+  ctx.globalAlpha=1;
+  // moon
+  const mx=300-cam*0.03;ctx.fillStyle='rgba(255,243,196,.08)';ctx.beginPath();ctx.arc(mx,44,30,0,7);ctx.fill();
+  ctx.fillStyle=C.moon;ctx.beginPath();ctx.arc(mx,44,16,0,7);ctx.fill();
+  ctx.fillStyle=C.skyTop;ctx.beginPath();ctx.arc(mx+7,39,14,0,7);ctx.fill();
+  [[0.2,C.far,0],[0.45,C.mid,1]].forEach(([par,col,layer])=>{
+    const off=cam*par;
+    for(const b of skyline[layer]){const x=(b.x-off)|0;if(x+b.w<0||x>W)continue;
+      ctx.fillStyle=col;ctx.fillRect(x,H-b.h,b.w,b.h);
+      if(layer){let k=0;for(let wy=H-b.h+6;wy<H-8;wy+=9)for(let wx=x+4;wx<x+b.w-5;wx+=7){if(b.wins[k++%40]){ctx.fillStyle='rgba(255,207,107,.55)';ctx.fillRect(wx,wy,3,4)}}}
+    }
+  });
+}
+function drawTiles(){
+  const x0=Math.floor(cam/T),x1=Math.ceil((cam+W)/T);
+  for(let ty=0;ty<ROWS;ty++)for(let tx=x0;tx<=x1;tx++){
+    const t=tile(tx,ty);if(!t||tx>=L.w)continue;
+    const x=Math.round(tx*T-cam),y=ty*T;
+    if(t===1){
+      ctx.fillStyle=C.brick;ctx.fillRect(x,y,T,T);
+      ctx.fillStyle=C.brickLine;ctx.fillRect(x,y+7,T,1);ctx.fillRect(x+((ty%2)?4:11),y,1,7);ctx.fillRect(x+((ty%2)?11:4),y+8,1,8);
+      if(!solid(tx,ty-1)){ctx.fillStyle=C.roof;ctx.fillRect(x,y,T,5);ctx.fillStyle=C.roofEdge;ctx.fillRect(x,y,T,2);for(let i=2;i<T;i+=5)ctx.fillRect(x+i,y+3,2,1)}
+      else if((tx*7+ty*3)%9===0){ctx.fillStyle=(tx+ty)%2?C.win:C.winOff;ctx.fillRect(x+5,y+4,6,7)}
+    }else if(t===2){
+      ctx.fillStyle=C.plank;ctx.fillRect(x,y,T,6);ctx.fillStyle=C.plankTop;ctx.fillRect(x,y,T,2);
+      ctx.fillStyle=C.brickLine;ctx.fillRect(x+T-1,y+2,1,4);
+    }else if(t===3){
+      ctx.fillStyle=C.spike;for(let i=0;i<4;i++){ctx.beginPath();ctx.moveTo(x+i*4,y+T);ctx.lineTo(x+i*4+2,y+T-8);ctx.lineTo(x+i*4+4,y+T);ctx.fill()}
+    }
+  }
+}
+function starShape(x,y,r){ctx.beginPath();for(let i=0;i<10;i++){const a=-Math.PI/2+i*Math.PI/5,rr=i%2?r*0.45:r;ctx.lineTo(x+Math.cos(a)*rr,y+Math.sin(a)*rr)}ctx.closePath();ctx.fill()}
+function drawStars(){for(const s of L.stars){if(s.got)continue;const x=s.x-cam;if(x<-10||x>W+10)continue;const by=Math.sin(frame/18+s.x)*1.5;
+  ctx.fillStyle='rgba(255,216,90,.18)';ctx.beginPath();ctx.arc(x,s.y+by,7,0,7);ctx.fill();ctx.fillStyle=C.star;starShape(x,s.y+by,5)}}
+function drawHearts(){for(const h of L.hearts){if(h.got)continue;const x=Math.round(h.x-cam),y=Math.round(h.y+Math.sin(frame/14)*1.5);if(x<-10||x>W+10)continue;
+  ctx.fillStyle='rgba(255,93,143,.2)';ctx.beginPath();ctx.arc(x,y,8,0,7);ctx.fill();ctx.fillStyle=C.eye;
+  ctx.fillRect(x-5,y-3,4,3);ctx.fillRect(x+1,y-3,4,3);ctx.fillRect(x-6,y-2,12,3);ctx.fillRect(x-5,y+1,10,2);ctx.fillRect(x-3,y+3,6,1);ctx.fillRect(x-1,y+4,2,1);ctx.fillStyle='#fff';ctx.fillRect(x-4,y-2,1,1)}}
+function drawGoal(){const g=L.goal;if(!g)return;const x=Math.round(g.x-cam),y=g.y;
+  const pulse=.5+.5*Math.sin(frame/15);
+  ctx.fillStyle=`rgba(255,233,168,${.12+.12*pulse})`;ctx.beginPath();ctx.arc(x+8,y+14,20,0,7);ctx.fill();
+  ctx.fillStyle=C.roof;ctx.fillRect(x-2,y-2,20,34);
+  ctx.fillStyle=C.door;ctx.fillRect(x+1,y+1,14,31);
+  ctx.fillStyle=C.star;starShape(x+8,y-8,5);
+  ctx.fillStyle=C.roofEdge;ctx.fillRect(x+11,y+16,2,2);
+}
+function drawEnemies(){for(const e of L.enemies){
+  const x=Math.round(e.x-cam),y=Math.round(e.y);if(x<-20||x>W+20)continue;
+  if(!e.alive){if(e.squash<25){ctx.fillStyle=C.enemy;ctx.fillRect(x-1,y+9,14,3)}continue}
+  const wob=Math.sin(frame/6+e.x)*1;
+  ctx.fillStyle=C.enemy;ctx.beginPath();ctx.ellipse(x+6,y+7+wob*.3,7,6.5+wob*.3,0,0,7);ctx.fill();
+  ctx.fillRect(x-1,y+7,14,5);
+  for(let i=0;i<4;i++)ctx.fillRect(x+i*4-1,y+11,2,1+((frame/8+i)|0)%2);
+  ctx.fillStyle=C.eye;const ex=e.vx>0?1:-1;ctx.fillRect(x+3+ex,y+4,2,2);ctx.fillRect(x+8+ex,y+4,2,2);
+}}
+function drawCat(){
+  if(P.inv>0&&(frame>>2)%2)return;
+  const x=Math.round(P.x-cam),y=Math.round(P.y),f=P.face;
+  const run=P.onGround&&Math.abs(P.vx)>.3?((frame>>3)%2):0;
+  ctx.save();ctx.translate(x+6,0);ctx.scale(f,1);ctx.translate(-6,0);
+  // tail
+  ctx.fillStyle=C.catDark;ctx.fillRect(-3,y+4+(run?1:0),2,6);ctx.fillRect(-4,y+2,2,3);
+  // body
+  ctx.fillStyle=C.cat;ctx.fillRect(0,y+6,11,6);
+  // head
+  ctx.fillRect(6,y+1,7,7);ctx.fillRect(6,y-1,2,2);ctx.fillRect(11,y-1,2,2);
+  ctx.fillStyle=C.catDark;ctx.fillRect(2,y+7,1,3);ctx.fillRect(5,y+7,1,3);
+  // eye
+  ctx.fillStyle='#120e2b';ctx.fillRect(10,y+3,2,2);ctx.fillStyle=C.star;ctx.fillRect(11,y+3,1,1);
+  // legs
+  ctx.fillStyle=C.catDark;
+  if(!P.onGround){ctx.fillRect(1,y+12,2,2);ctx.fillRect(8,y+12,2,2)}
+  else if(run){ctx.fillRect(0,y+12,2,2);ctx.fillRect(9,y+12,2,2)}
+  else{ctx.fillRect(1,y+12,2,2);ctx.fillRect(4,y+12,2,2);ctx.fillRect(7,y+12,2,2);ctx.fillRect(9,y+12,2,2)}
+  ctx.restore();
+}
+function drawParticles(){for(const p of particles){ctx.globalAlpha=Math.min(1,p.life/20);ctx.fillStyle=p.col;ctx.fillRect(Math.round(p.x-cam),Math.round(p.y),2,2)}ctx.globalAlpha=1}
+function render(){drawBg();drawTiles();drawGoal();drawStars();drawHearts();drawEnemies();drawCat();drawParticles()}
+
+/* ---------- UI ---------- */
+const $=id=>document.getElementById(id), ov=$('ov'), card=$('card');
+function hud(){
+  if(!L)return;
+  $('hLevel').textContent=`${lvl+1}/${LEVELS.length}`;
+  $('hStars').textContent=`${L.stars.filter(s=>s.got).length}/${L.stars.length}`;
+  $('hScore').textContent=score;
+  $('hLives').textContent='♥'.repeat(Math.max(0,lives))+'♡'.repeat(Math.max(0,3-lives));
+}
+function show(html,btn,act){card.innerHTML=html+`<button class="play" id="go">${btn}</button>`;ov.hidden=false;const b=$('go');b.onclick=act;try{b.focus({preventScroll:true})}catch(e){}}
+function saveBest(){if(score>best){best=score;try{localStorage.setItem('kot-best',best)}catch(e){}}}
+function menu(){state='menu';show(`<h2>Кот на крышах</h2><p>Ночь, город спит. Помогите коту пробежать по крышам, собрать звёзды и добраться до светящейся двери.</p><p class="sub">Прыгайте на тени сверху — они исчезнут. Шипы и пропасти отнимают жизнь, а сердечки её возвращают.</p>${best?`<p class="sub">Рекорд: ${best}</p>`:''}`,'Играть',()=>{score=0;lives=3;loadLevel(0);start()})}
+function start(){ov.hidden=true;state='play';keys.jump=false;jumpHeld=true}
+function levelDone(){
+  state='done';score+=100;const got=L.stars.filter(s=>s.got).length,all=L.stars.length;
+  if(got===all)score+=200;hud();
+  if(lvl<LEVELS.length-1){show(`<h2>Уровень ${lvl+1} пройден</h2><p>Звёзд: ${got} из ${all}${got===all?' — все! +200':''}</p><p class="sub">Очки: ${score}</p>`,'Дальше',()=>{loadLevel(lvl+1);start()})}
+  else{saveBest();show(`<h2>Победа!</h2><p>Кот добрался до дома. Итог: <b>${score}</b> очков.</p><p class="sub">Рекорд: ${best}</p>`,'Играть снова',()=>{score=0;lives=3;loadLevel(0);start()})}
+}
+function gameOver(){state='over';saveBest();show(`<h2>Игра окончена</h2><p>Очки: ${score}</p><p class="sub">Рекорд: ${best}</p>`,'Ещё раз',()=>{score=levelScoreStart;lives=3;loadLevel(lvl);start()})}
+function pause(){if(state==='play'){state='pause';show(`<h2>Пауза</h2>`,'Продолжить',start)}else if(state==='pause')start()}
+
+/* ---------- input ---------- */
+const map={ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right',ArrowUp:'jump',KeyW:'jump',Space:'jump'};
+addEventListener('keydown',e=>{
+  if(e.code==='KeyP'||e.code==='Escape'){pause();return}
+  const k=map[e.code];if(!k)return;
+  if(state!=='play'){if(k==='jump'&&document.activeElement?.id!=='go'){$('go')?.click();e.preventDefault()}return}
+  keys[k]=true;e.preventDefault();
+});
+addEventListener('keyup',e=>{const k=map[e.code];if(k)keys[k]=false});
+addEventListener('blur',()=>{keys.left=keys.right=keys.jump=false});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&state==='play')pause()});
+[['bL','left'],['bR','right'],['bJ','jump']].forEach(([id,k])=>{const b=$(id);
+  const on=e=>{e.preventDefault();keys[k]=true;b.classList.add('on')},off=e=>{keys[k]=false;b.classList.remove('on')};
+  b.addEventListener('pointerdown',on);['pointerup','pointercancel','pointerleave'].forEach(t=>b.addEventListener(t,off));
+  b.addEventListener('contextmenu',e=>e.preventDefault());
+});
+
+/* ---------- loop ---------- */
+let last=performance.now(),acc=0;
+function loop(now){
+  acc+=Math.min(0.1,(now-last)/1000);last=now;
+  while(acc>=1/60){if(state==='play')step();acc-=1/60}
+  render();requestAnimationFrame(loop);
+}
+loadLevel(0);menu();requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
