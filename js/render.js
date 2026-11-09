@@ -517,7 +517,7 @@ R.frame=function(dt,now){
 
   // камера
   let tx,ty;
-  if(R.hub){tx=cx+(innerWidth>760&&innerHeight>520?3.4:innerHeight<=520?2.6:0);ty=ROWS-10+(innerWidth>760?1.4:2.6)}
+  if(R.hub){tx=cx+(innerWidth>760&&innerHeight>520?3.4:innerHeight<=520?2.6:0);ty=ROWS-10+(innerWidth>innerHeight?1.4:-2.2)}
   else if(G.boss){tx=clampCam((cx+wx(G.boss.x+G.boss.w/2))/2);ty=7.2}
   else{tx=clampCam(cx+P.face*2.5);ty=6.3+Math.max(0,cy-8)*.55-(Math.max(0,4-cy))*.3}
   camX+=(tx-camX)*Math.min(1,dt*4);camY+=(ty-camY)*Math.min(1,dt*3);
