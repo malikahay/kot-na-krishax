@@ -250,6 +250,10 @@ K.LEVELS=[
 K.LEVEL=Object.fromEntries(K.LEVELS.map((l,i)=>[l.id,Object.assign(l,{index:i})]));
 
 function descend(b){if(b.top<6){b.gap(2);b.roof(b.ri(3,5),Math.min(11,b.top+b.ri(3,4)))}}
+function lowerStars(L){
+  for(const s of L.stars){const c=Math.floor(s.x/T),r=Math.floor(s.y/T);const sb=surfaceBelow(L,c,r);
+    if(sb<ROWS&&sb-r>=2&&sb-r<=3){const nr=sb-1;if(!L.g[nr][c])s.y=nr*T+8}}
+}
 function finalize(b,parPerTile){
   const L=b.L;
   if(!L.goal){CH.finish(b,null)}
@@ -302,6 +306,7 @@ K.buildLevel=function(def){
   const L=Object.assign(finalize(b,5.4),{def});
   if(def.world===2)cave(L);
   placeItems(L,def,b.R);
+  lowerStars(L);
   return L;
 };
 
@@ -322,7 +327,7 @@ K.buildProcedural=function(seed,chunks,endless){
     if(i%4===3)CH.check(b);
   }
   CH.finish(b,null);
-  const L=finalize(b,4.4);L.procedural=true;return L;
+  const L=finalize(b,4.4);L.procedural=true;lowerStars(L);return L;
 };
 K.dailySeed=function(d=new Date()){return d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate()};
 K.dailyKey=function(d=new Date()){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
