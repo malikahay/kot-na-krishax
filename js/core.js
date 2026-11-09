@@ -404,8 +404,9 @@ function makeBoss(B){
 }
 function bossVulnerable(B,how){
   if(B.inv>0||B.st==='intro'||B.st==='dying')return false;
-  if(how==='stomp')return !B.armor;
-  return B.king?(B.st==='dazed'||B.st==='swoop'):true;
+  if(B.king)return (B.st==='dazed'||B.st==='swoop')&&(how!=='stomp'||!B.armor);
+  if(B.armor)return how!=='stomp';
+  return B.st==='tired';
 }
 function hitBoss(B,how){
   if(B.armor&&how!=='stomp'&&!B.king){B.armor=false;B.inv=20;B.st=B.king?B.st:'tired';B.t=0;G.hitstop=8;emit('armorBreak',{x:B.x+B.w/2,y:B.y});return}
@@ -480,7 +481,7 @@ function kingAI(B,P,W){
     case 'intro':if(B.t===1)emit('bossIntro',{name:'Король Теней'});floatTo(W/2-B.w/2,hoverY,.03);if(B.t>110){B.st='hover';B.t=0}break;
     case 'hover':{
       const tx=W/2-B.w/2+Math.sin(G.frame/(70/sp))*(W/2-5*T);floatTo(tx,hoverY,.05);
-      if(B.t>(ph===3?70:100)){B.t=0;const r=Math.random();B.st=r<.38?'rain':r<.62&&ph<3?'bats':r<.8&&ph===3?'quake':'swoop';if(B.st==='swoop'){B.tx=P.x+6-B.w/2;B.ty=11*T-B.h}}
+      if(B.t>(ph===3?85:130)){B.t=0;const r=Math.random();B.st=r<.38?'rain':r<.62&&ph<3?'bats':r<.8&&ph===3?'quake':'swoop';if(B.st==='swoop'){B.tx=P.x+6-B.w/2;B.ty=11*T-B.h}}
       break}
     case 'rain':floatTo(B.x,hoverY,.05);if(B.t%(ph===3?10:16)===0&&B.t<90){const x=3*T+Math.random()*(W-6*T);G.shots.push({x,y:-4,vx:0,vy:1.6+ph*.3,life:240,rain:true});if(B.t%32===0)emit('shoot',{x,y:0})}if(B.t>110){B.st=Math.random()<.5?'swoop':'hover';B.t=0;B.tx=P.x+6-B.w/2;B.ty=11*T-B.h}break;
     case 'bats':floatTo(B.x,hoverY,.05);if(B.t===20){summon('bat');summon(ph===2?'armored':'hopper')}if(B.t>60){B.st='swoop';B.t=0;B.tx=P.x+6-B.w/2;B.ty=11*T-B.h}break;

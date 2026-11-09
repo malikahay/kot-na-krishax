@@ -416,7 +416,7 @@ R.buildLevel=function(G,opts={}){
   if(follower){scene.remove(follower);follower=null}
   hubFriends.forEach(f=>scene.remove(f));hubFriends=[];
   R.hub=!!L.hub;CAM_DIST=L.hub?11:L.arena?30:18;
-  const cx=wx(G.P.x+6);camX=clampCam(cx+2);camY=6.3;
+  R._snap=true;
   R.applyLight(G);
 };
 function buildGoal(goal){
@@ -520,6 +520,7 @@ R.frame=function(dt,now){
   if(R.hub){tx=cx+(innerWidth>760&&innerHeight>520?3.4:innerHeight<=520?2.6:0);ty=ROWS-10+(innerWidth>innerHeight?1.4:-2.2)}
   else if(G.boss){tx=clampCam((cx+wx(G.boss.x+G.boss.w/2))/2);ty=7.2}
   else{tx=clampCam(cx+P.face*2.5);ty=6.3+Math.max(0,cy-8)*.55-(Math.max(0,4-cy))*.3}
+  if(R._snap){camX=tx;camY=ty;R._snap=false}
   camX+=(tx-camX)*Math.min(1,dt*4);camY+=(ty-camY)*Math.min(1,dt*3);
   const sh=shake>0?shake:0;const sx=(Math.random()-.5)*.05*sh,sy=(Math.random()-.5)*.05*sh;if(shake>0)shake=Math.max(0,shake-dt*30);
   camera.position.set(camX+(R.hub?.8:1.6)+sx,camY+(R.hub?.9:1.4)+sy,effDist());camera.lookAt(camX,camY,0);

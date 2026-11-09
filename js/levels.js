@@ -252,7 +252,7 @@ K.buildLevel=function(def){
   const b=Builder(def.seed,900);b.pool=def.pool;b.foeRate=def.foe;
   for(const step of def.plan){descend(b);CH[step](b)}
   CH.finish(b,def.friend);
-  return Object.assign(finalize(b,4.6),{def});
+  return Object.assign(finalize(b,5.4),{def});
 };
 
 /* Процедурный уровень для испытаний: всё смешано, сложность растёт к концу. */

@@ -221,7 +221,7 @@ U.confirm=function(text,yes){
 
 /* ---------- HUD ---------- */
 let lastHud='';
-U.hudShow=function(on){$('hud').hidden=!on;$('pad').classList.toggle('show',on);if(!on){$('bossbar').hidden=true;$('hCombo').className='combo'}};
+U.hudShow=function(on){$('hud').hidden=!on;$('pad').classList.toggle('show',on);if(!on){$('bossbar').hidden=true;$('hCombo').className='combo';$('banner').className='banner';$('fx').innerHTML=''}};
 U.hud=function(){
   const G=K.G;if(!G.P)return;
   const lives=Math.max(0,G.lives),full=Math.max(G.maxLives,lives);

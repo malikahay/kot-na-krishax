@@ -31,6 +31,7 @@ function enterLevel(L,theme,music,opts){
   UI.hide();UI.hudShow(true);UI.bossBar(null);
   K.input.left=K.input.right=K.input.jump=false;
   if(L.def&&!L.def.boss)UI.banner(L.def.name,L.def.news);
+  app.platformGameplay(true);
 }
 app.play=function(id,mode='story'){
   const def=K.LEVEL[id];cur={id,mode};
@@ -52,14 +53,14 @@ app.playEndless=function(){
   enterLevel(L,th,th.music,{mode:'endless',abil:ALL});UI.banner('Бесконечная ночь','Беги, пока есть сердца');
 };
 app.toHub=function(t){
-  cur=null;UI.hudShow(false);
+  cur=null;app.platformGameplay(false);UI.hudShow(false);
   const L=K.buildHub();K.startLevel(L,{mode:'hub',abil:[]});G.state='idle';
   R.setTheme(K.HUB_THEME);R.setSkin(S.skin);R.buildHub(G,S.friends);
   A.play('hub');UI.hub(t);
 };
 function restart(){if(!cur)return;if(cur.mode==='daily')app.playDaily();else if(cur.mode==='endless')app.playEndless();else app.play(cur.id,cur.mode)}
-function pause(){if(G.state==='play'&&cur){G.state='pause';UI.pause()}else if(G.state==='pause')resume()}
-function resume(){if(G.state==='pause'||G.state==='rescue'){G.state='play';UI.hide();K.input.taps.jump=0}}
+function pause(){if(G.state==='play'&&cur){G.state='pause';UI.pause();app.platformGameplay(false)}else if(G.state==='pause')resume()}
+function resume(){if(G.state==='pause'||G.state==='rescue'){G.state='play';UI.hide();K.input.taps.jump=0;app.platformGameplay(true)}}
 
 /* ---------- итоги ---------- */
 function finishStory(){
@@ -183,6 +184,15 @@ function haptic(kind){
     if(tg&&tg.HapticFeedback){if(kind==='success'||kind==='error')tg.HapticFeedback.notificationOccurred(kind);else tg.HapticFeedback.impactOccurred(kind)}
     else if(navigator.vibrate&&matchMedia('(pointer:coarse)').matches)navigator.vibrate(kind==='heavy'?40:kind==='light'?12:kind==='error'?[30,40,30]:20);
   }catch(e){}
+}
+
+/* ---------- Яндекс Игры: SDK подключается, только когда игра открыта на их площадке ---------- */
+let ysdk=null;
+app.platformGameplay=function(on){try{const g=ysdk&&ysdk.features&&ysdk.features.GameplayAPI;if(g)on?g.start():g.stop()}catch(e){}};
+if(/yandex|playhop/.test(location.hostname)||/[?&]yandex/.test(location.search)){
+  const s=document.createElement('script');s.src='/sdk.js';
+  s.onload=()=>{window.YaGames&&YaGames.init().then(sdk=>{ysdk=sdk;try{sdk.features.LoadingAPI&&sdk.features.LoadingAPI.ready()}catch(e){}}).catch(()=>{})};
+  document.head.appendChild(s);
 }
 
 /* ---------- ввод ---------- */
