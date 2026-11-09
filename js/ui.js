@@ -19,10 +19,10 @@ U.title=function(){
   const S=K.app.save,started=Object.keys(S.levels).length>0;
   show(`<div class="title">
     <h1 class="logo">Кот на<br><span>крышах</span></h1>
-    <p class="tag">Король Теней запер друзей кота в клетках на крышах ночного города. Спасите всех, научитесь новому и верните свет.</p>
+    <p class="tag">Король Теней запер друзей кота в клетках и спрятал ключи. По следу бежит его пёс. Найдите ключи, ставьте ловушки и доберитесь до берлоги Короля.</p>
     <div class="row"><button class="btn" data-act="enter" autofocus>${started?'Продолжить':'Играть'}</button>
     ${K.app.canInstall()?'<button class="btn ghost" data-act="install">Установить</button>':''}</div>
-    <p class="desk">Бег <kbd>←</kbd><kbd>→</kbd> · прыжок <kbd>Пробел</kbd> · перекат <kbd>Shift</kbd> · лапа <kbd>X</kbd> · пауза <kbd>P</kbd> · звук <kbd>M</kbd></p>
+    <p class="desk">Бег <kbd>←</kbd><kbd>→</kbd> · прыжок <kbd>Пробел</kbd> · перекат <kbd>Shift</kbd> · лапа <kbd>X</kbd> · ловушка <kbd>C</kbd> · пауза <kbd>P</kbd> · звук <kbd>M</kbd></p>
     <p class="sub rotate show">Поверните телефон горизонтально — так удобнее.</p>
   </div>`,'dim');
 };
@@ -130,6 +130,7 @@ function setPane(){
   <div class="kv"><span>Прыжок, планирование</span><span><kbd>Пробел</kbd> / <kbd>W</kbd></span></div>
   <div class="kv"><span>Перекат</span><span><kbd>Shift</kbd> / <kbd>J</kbd></span></div>
   <div class="kv"><span>Удар лапой</span><span><kbd>X</kbd> / <kbd>K</kbd></span></div>
+  <div class="kv"><span>Ловушка для пса</span><span><kbd>C</kbd> / <kbd>E</kbd></span></div>
   <div class="kv"><span>Пауза · заново</span><span><kbd>P</kbd> · <kbd>R</kbd></span></div>
   <div class="kv"><span>Геймпад</span><span>поддерживается</span></div>
   <div class="row" style="margin-top:14px;justify-content:flex-start">
@@ -153,6 +154,8 @@ U.levelIntro=function(id){
     <h2>${esc(l.name)}</h2>
     <p>${esc(l.news)}</p>
     ${fr?`<p class="sub">${rescued?`${esc(fr.name)} уже дома`:`В клетке ждёт: <b>${esc(fr.name)}</b> → ${esc(fr.abilName)}`}</p>`:''}
+    ${l.need&&!rescued?`<div class="needs">${Object.entries(l.need).map(([k,n])=>`<span>${K.ITEMS[k].icon} ${esc(K.ITEMS[k].name)} ×${n}</span>`).join('')}</div><p class="sub">Вещи спрятаны на уровне — без них клетку не открыть.</p>`:''}
+    ${l.boss?'':(()=>{const story=K.LEVELS.filter(x=>!x.boss),ti=story.indexOf(l),tr=K.TRAPS[ti];return `<p class="sub">🐕 За вами бежит <b>${esc(K.CHASERS[l.world].name)}</b>. Ловушка уровня: ${tr.icon} <b>${esc(tr.name)}</b> ×${tr.charges} — ${esc(tr.desc.toLowerCase())}.</p>`})()}
     ${st?`<div class="goals" style="width:100%"><div class="kv"><span>Оценка</span><b style="color:var(--star)">${stars3(st.stars)}</b></div>
       <div class="kv"><span>Лучшее время</span><b>${st.time?fmtT(st.time):'—'}</b></div><div class="kv"><span>Норматив</span><b>${fmtT(K.app.parOf(id))}</b></div>
       ${l.boss?'':`<div class="kv"><span>Золотая рыбка</span><b>${st.fish?'найдена 🐟':'ищите…'}</b></div>`}</div>`:''}
@@ -211,17 +214,25 @@ U.runResults=function(r){
 };
 U.ending=function(){
   show(`<div class="card"><h2>Свет вернулся в город</h2>
-    <p>Король Теней рассыпался на тысячу звёзд. Кот и все его друзья сидят на крыше и смотрят на луну.</p>
+    <p>Король Теней рассыпался на тысячу звёзд, а его берлога обрушилась. Цербер снова стал маленьким щенком и тоже пришёл домой. Кот и все друзья сидят на крыше и смотрят на луну.</p>
     <p class="sub">Открыты скин «Тень» и корона. Ищите золотых рыбок на старых уровнях, проходите испытание дня и бейте свои рекорды на время.</p>
     <div class="row"><button class="btn" data-act="hub" autofocus>Домой</button></div></div>`);
 };
+U.story=function(key,i,done){
+  const P=K.STORY[key],p=P[i],last=i===P.length-1;
+  show(`<div class="card story"><div class="art">${p.art}</div><p class="t">${esc(p.text)}</p>
+    <div class="dots">${P.map((_,k)=>`<i class="${k===i?'on':''}"></i>`).join('')}</div>
+    <div class="row"><button class="btn" data-act="storyNext" autofocus>${last?'В путь!':'Дальше'}</button>${last?'':'<button class="btn ghost" data-act="storySkip">Пропустить</button>'}</div></div>`);
+  U._story={key,i,done};
+};
+U.storyNext=function(skip){const st=U._story;if(!st)return;const P=K.STORY[st.key];if(skip||st.i>=P.length-1){U._story=null;st.done()}else U.story(st.key,st.i+1,st.done)};
 U.confirm=function(text,yes){
   show(`<div class="card"><h2>Точно?</h2><p>${esc(text)}</p><div class="row"><button class="btn" data-act="${yes}">Да</button><button class="btn ghost" data-act="hub" autofocus>Нет</button></div></div>`);
 };
 
 /* ---------- HUD ---------- */
 let lastHud='';
-U.hudShow=function(on){$('hud').hidden=!on;$('pad').classList.toggle('show',on);if(!on){$('bossbar').hidden=true;$('hCombo').className='combo';$('banner').className='banner';$('fx').innerHTML=''}};
+U.hudShow=function(on){$('hud').hidden=!on;if(!on&&U.clearFast)U.clearFast();$('pad').classList.toggle('show',on);if(!on){$('bossbar').hidden=true;$('hCombo').className='combo';$('banner').className='banner';$('fx').innerHTML=''}};
 U.hud=function(){
   const G=K.G;if(!G.P)return;
   const lives=Math.max(0,G.lives),full=Math.max(G.maxLives,lives);
@@ -236,8 +247,29 @@ U.hud=function(){
   const par=K.app.currentPar();$('hTimeChip').style.color=par&&G.time/60>par?'var(--muted)':'';
   $('hAbil').innerHTML=K.FRIENDS.filter(f=>G.abil.has(f.abil)).map(f=>`<span title="${esc(f.abilName)}">${f.icon}</span>`).join('');
   const c=$('hCombo');if(G.combo>=2){if(c.dataset.n!=G.combo){c.textContent=`КОМБО ×${Math.min(8,G.combo)}`;c.className='combo';void c.offsetWidth;c.className='combo on';c.dataset.n=G.combo}}else if(c.dataset.n!=='0'){c.className='combo';c.dataset.n='0'}
-  $('tDash').hidden=!G.abil.has('dash');$('tPaw').hidden=!G.abil.has('paw');
+  $('tDash').hidden=!G.abil.has('dash');$('tPaw').hidden=!G.abil.has('paw');$('tTrap').hidden=!(G.trapDef&&G.chase);
+  const needK=Object.keys(G.need||{});const hi=$('hItems');hi.hidden=!needK.length;
+  if(needK.length)hi.innerHTML=needK.map(k=>{const h=G.have[k]||0,n=G.need[k];return `<span class="${h>=n?'ok':''}">${K.ITEMS[k].icon} ${h}/${n}</span>`}).join('');
+  const ht=$('hTrap');ht.hidden=!(G.trapDef&&G.chase);if(G.trapDef)ht.innerHTML=`${G.trapDef.icon} ×${G.trapsLeft}`;
 };
+U.hudFast=function(){
+  const G=K.G;if(!G.P)return;
+  const C=G.chase,hd=$('hDog');hd.hidden=!(C&&C.on);
+  if(C&&C.on){const danger=Math.max(0,Math.min(1,1-C.gap/220));$('hDogM').style.width=(danger*100)+'%';hd.classList.toggle('near',danger>.75&&C.stun===0)}
+  const mk=$('marks');let html='';
+  if(G.items&&G.state==='play'){for(const it of G.items){if(it.got||Math.abs(it.x-G.P.x)>20*16)continue;
+    const p=K.render.toScreen(it.x,it.y);const off=p.x<3||p.x>97||p.y<8||p.y>95;
+    const x=Math.max(3,Math.min(97,p.x)),y=Math.max(10,Math.min(92,p.y));
+    if(off||K.render.inDark)html+=`<span class="mark ${off?'edge':''}" style="left:${x}%;top:${y}%">${K.ITEMS[it.type].icon}</span>`}}
+  if(mk._h!==html){mk.innerHTML=html;mk._h=html}
+  const dk=$('dark');let inDark=false;const cx=G.P.x+6;
+  for(const d of G.darks||[])if(cx>d.x0-8&&cx<d.x1+8)inDark=true;
+  K.render.inDark=inDark&&G.state!=='idle';
+  if(inDark){const p=K.render.toScreen(G.P.x+6,G.P.y+4);const r=G.abil.has('light')?190:110;
+    dk.style.background=`radial-gradient(circle at ${p.x}% ${p.y}%, rgba(2,1,8,0) 0, rgba(2,1,8,0) ${r*.55}px, rgba(2,1,8,.96) ${r*1.35}px)`}
+  dk.style.opacity=inDark?1:0;
+};
+U.clearFast=function(){$('marks').innerHTML='';$('marks')._h='';$('dark').style.opacity=0;$('hDog').hidden=true};
 U.pop=function(e){
   const p=K.render.toScreen(e.x,e.y);if(p.x<-5||p.x>105||p.y<-5||p.y>105)return;
   const d=document.createElement('div');d.className='pop'+(e.big?' big':'');d.textContent=e.text;d.style.left=p.x+'%';d.style.top=p.y+'%';d.style.color=e.col||'#fff';
@@ -262,6 +294,14 @@ U.onEvent=function(e){
     case 'fish':U.banner('Золотая рыбка!','+500 очков');break;
     case 'comboEnd':if(e.n>=3)U.banner(`Комбо ×${e.n}!`,e.n>=5?'Невероятно!':'Отлично!');break;
     case 'shieldBreak':U.toast('Щит Колючки спас вас!');break;
+    case 'item':U.toast(`${K.ITEMS[e.type].icon} ${K.ITEMS[e.type].name}: ${e.have}/${e.need}`);if(K.cageReady())setTimeout(()=>U.banner('Всё собрано!','Бегите к клетке'),600);break;
+    case 'kit':U.toast('🧰 +1 ловушка');break;
+    case 'cageLocked':U.banner('Клетка заперта',Object.entries(e.missing).map(([k,n])=>`${K.ITEMS[k].icon}×${n}`).join('  ')+' — вернитесь и поищите');break;
+    case 'chaserStart':U.banner(`${e.name} идёт по следу!`,K.G.trapDef?`Ставьте ловушки: ${matchMedia('(pointer:coarse)').matches?'кнопка 🪤':'клавиша C'}`:'Не останавливайтесь!');break;
+    case 'chaserHowl':U.toast('🐕 Пёс готовится к рывку!');break;
+    case 'chaserBite':U.flash();break;
+    case 'trapSnap':U.toast(`${K.TRAPS[e.tier].icon} Пёс попался!`);break;
+    case 'trapNo':U.toast(e.reason==='empty'?'Ловушки кончились — ищите 🧰':e.reason==='air'?'Ловушку ставят на земле':'Здесь некого ловить');break;
   }
 };
 })(window.KOT=window.KOT||{});

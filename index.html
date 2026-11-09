@@ -166,6 +166,22 @@ kbd{font-family:var(--body);background:#231b4f;border:1px solid #4a3f8a;border-b
 .pad .col{display:flex;flex-direction:column;gap:10px}
 @media (pointer:coarse){.pad.show{display:flex}.desk{display:none}}
 .desk{color:var(--muted);font-size:12px}
+.items{gap:8px}.items .ok{color:var(--mint)}
+.dog .meter{width:54px;height:8px;border-radius:999px;background:#2a2160;overflow:hidden;display:inline-block}
+.dog i{display:block;height:100%;width:0;background:linear-gradient(90deg,#7ff7c8,#ffd85a,#ff5d8f);transition:width .2s}
+.dog.near{border-color:var(--danger);animation:shakeX .3s infinite}
+@keyframes shakeX{50%{transform:translateX(2px)}}
+#dark{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .6s}
+#marks{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.mark{position:absolute;transform:translate(-50%,-50%);font-size:18px;filter:drop-shadow(0 0 6px rgba(255,216,90,.9));animation:bob 1s ease-in-out infinite}
+.mark.edge{font-size:14px;opacity:.85}
+@keyframes bob{50%{margin-top:-4px}}
+.story{max-width:min(560px,92vw)}
+.story .art{font-size:clamp(40px,10vw,72px);line-height:1.1;letter-spacing:4px;min-height:1.2em}
+.story p.t{font-size:16px;line-height:1.55;max-width:44ch}
+.dots{display:flex;gap:6px}.dots i{width:8px;height:8px;border-radius:50%;background:#3a3070}.dots i.on{background:var(--star)}
+.needs{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;font-size:14px}
+.needs span{background:#211a50;border:1px solid var(--line);border-radius:999px;padding:4px 10px}
 .rotate{display:none}
 @media (pointer:coarse) and (orientation:portrait){.rotate.show{display:block}}
 </style>
@@ -173,6 +189,8 @@ kbd{font-family:var(--body);background:#231b4f;border:1px solid #4a3f8a;border-b
 <body>
 <div class="stage" id="stage">
   <canvas id="c" aria-label="Игровое поле"></canvas>
+  <div id="dark"></div>
+  <div id="marks"></div>
   <div id="fx"></div>
   <div class="flash" id="flash"></div>
   <div class="hud safe" id="hud" hidden>
@@ -180,6 +198,9 @@ kbd{font-family:var(--body);background:#231b4f;border:1px solid #4a3f8a;border-b
       <span class="chip"><span class="hearts" id="hLives"></span><span class="shieldchip" id="hShield" hidden>✷</span></span>
       <span class="chip"><span class="s">★</span><b id="hStars">0/0</b></span>
       <span class="chip"><b id="hScore">0</b></span>
+      <span class="chip items" id="hItems" hidden></span>
+      <span class="chip" id="hTrap" hidden></span>
+      <span class="chip dog" id="hDog" hidden>🐕 <span class="meter"><i id="hDogM"></i></span></span>
     </div>
     <div class="grp">
       <span class="chip" id="hTimeChip"><b id="hTime">0:00</b></span>
@@ -194,7 +215,7 @@ kbd{font-family:var(--body);background:#231b4f;border:1px solid #4a3f8a;border-b
   <div class="pad" id="pad">
     <div class="g"><button id="tL" aria-label="Влево">◀</button><button id="tR" aria-label="Вправо">▶</button></div>
     <div class="g">
-      <div class="col"><button class="act" id="tPaw" aria-label="Удар лапой" hidden>ЛАПА</button><button class="act" id="tDash" aria-label="Перекат" hidden>РЫВОК</button></div>
+      <div class="col"><button class="act" id="tTrap" aria-label="Ловушка" hidden>🪤</button><button class="act" id="tPaw" aria-label="Удар лапой" hidden>ЛАПА</button><button class="act" id="tDash" aria-label="Перекат" hidden>РЫВОК</button></div>
       <button class="jump" id="tJ" aria-label="Прыжок">ПРЫЖОК</button>
     </div>
   </div>

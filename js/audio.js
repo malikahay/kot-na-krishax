@@ -96,9 +96,26 @@ const S={
   click(){tone({type:'triangle',f:900,f2:1200,dur:.05,vol:.08})},
   buy(){[84,88,91].forEach((m,i)=>tone({type:'square',f:mtof(m),dur:.1,vol:.07,lp:3000,when:now()+i*.06}));noise({f:6000,ft:'highpass',dur:.15,vol:.05,when:now()+.15})},
   deny(){tone({type:'square',f:200,f2:150,dur:.15,vol:.08,lp:900})},
+  item(e){[76,83,88,95].forEach((m,i)=>tone({type:'square',f:mtof(m),dur:.12,vol:.07,lp:3500,when:now()+i*.06}));tone({type:'triangle',f:mtof(100),dur:.4,vol:.06,when:now()+.24,send:true})},
+  kit(){[72,79,84].forEach((m,i)=>tone({type:'triangle',f:mtof(m),dur:.12,vol:.1,when:now()+i*.05}))},
+  trapSet(){noise({f:1800,ft:'bandpass',dur:.06,vol:.12});tone({type:'square',f:300,f2:180,dur:.08,vol:.08,lp:1500})},
+  trapNo(){tone({type:'square',f:180,f2:140,dur:.12,vol:.06,lp:800})},
+  trapSnap(){noise({f:3000,f2:400,dur:.18,vol:.3,ft:'bandpass',q:1.5});tone({type:'square',f:900,f2:200,dur:.15,vol:.12});[60,67,72].forEach((m,i)=>tone({type:'triangle',f:mtof(m),dur:.15,vol:.08,when:now()+.1+i*.06}))},
+  chaserStart(){howl(.9)},
+  chaserHowl(){howl(.6)},
+  chaserBite(){bark();bark(.12)},
+  chaserBonk(){tone({type:'square',f:500,f2:200,dur:.15,vol:.1});bark()},
+  chaserFree(){bark()},
+  dripShake(){noise({f:600,dur:.25,vol:.06,ft:'bandpass'})},
+  dripBreak(){noise({f:2200,f2:400,dur:.2,vol:.18,ft:'bandpass'});tone({type:'triangle',f:1500,f2:900,dur:.1,vol:.05})},
+  geyser(){noise({f:300,f2:1800,dur:.5,vol:.14,ft:'bandpass',q:1.2});tone({type:'sawtooth',f:90,f2:60,dur:.5,vol:.06,lp:500})},
+  cageLocked(){tone({type:'square',f:220,dur:.08,vol:.08,lp:900});tone({type:'square',f:200,dur:.12,vol:.08,lp:900,when:now()+.1})},
   comboEnd(e){if(e.n>=3)[0,4,7].forEach((d,i)=>tone({type:'triangle',f:mtof(79+d),dur:.15,vol:.08,when:now()+i*.05}))}
 };
 A.sfxPlay=function(name,e={}){if(!A.ready||!A.sfx||!S[name])return;try{S[name](e)}catch(err){}};
+
+function howl(len){tone({type:'sawtooth',f:300,f2:520,dur:len,vol:.09,lp:1400,vib:6,vibAmt:18,attack:.08,slide:len*.5,send:true});tone({type:'sawtooth',f:305,f2:510,dur:len,vol:.05,lp:1200,vib:5,vibAmt:14,attack:.1,slide:len*.5})}
+function bark(d=0){noise({f:900,f2:300,dur:.09,vol:.2,ft:'bandpass',q:2,when:now()+d});tone({type:'sawtooth',f:260,f2:140,dur:.09,vol:.1,lp:1200,when:now()+d})}
 
 /* ---------- музыка: шаговый секвенсор с упреждающим планированием ---------- */
 const TRACKS={
@@ -106,6 +123,7 @@ const TRACKS={
   w1:{bpm:92,chords:[[57,60,64],[53,57,60],[48,52,55],[55,59,62]],drums:1,arp:[0,1,2,1,0,2,1,2],lead:.45,swing:.05,bass:[0,0,-1,0,-1,-1,0,-1]},
   w2:{bpm:100,chords:[[50,53,57],[46,50,53],[53,57,60],[48,52,55]],drums:1,arp:[0,2,1,2,0,2,1,0],lead:.4,swing:.03,bass:[0,-1,0,0,-1,0,-1,0]},
   w3:{bpm:96,chords:[[52,55,59],[48,52,55],[55,59,62],[50,54,57]],drums:1,arp:[2,1,0,1,2,1,0,2],lead:.5,swing:.06,bass:[0,-1,-1,0,-1,-1,0,0]},
+  lair:{bpm:84,chords:[[45,48,51],[44,47,51],[42,45,49],[44,47,50]],drums:1,arp:[0,2,1,2,0,1,2,1],lead:.3,swing:.02,bass:[0,-1,-1,0,-1,0,-1,-1]},
   boss:{bpm:132,chords:[[45,48,52],[45,48,52],[41,45,48],[43,47,50]],drums:2,arp:[0,1,2,1,0,1,2,1],lead:.15,swing:0,bass:[0,0,0,-1,0,0,0,0]},
   king:{bpm:140,chords:[[40,43,47],[41,44,48],[38,41,45],[39,43,46]],drums:2,arp:[0,1,2,3,2,1,0,2],lead:.2,swing:0,bass:[0,0,-1,0,0,0,-1,0]},
   win:{bpm:110,chords:[[60,64,67],[65,69,72],[67,71,74],[60,64,67]],drums:1,arp:[0,1,2,1,0,1,2,1],lead:.6,swing:.04,bass:[0,-1,0,-1,0,-1,0,-1]}

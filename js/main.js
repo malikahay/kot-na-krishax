@@ -24,6 +24,7 @@ const owned=(cat,id)=>{const it=K.SKINS[cat].find(i=>i.id===id);return it&&(!it.
 let cur=null,pendingEnding=false;
 app.currentPar=()=>cur&&G.L?G.L.par:0;
 function abilities(){return S.friends.map(id=>K.FRIEND[id].abil)}
+function bestTrap(){const story=K.LEVELS.filter(l=>!l.boss);let t=0;story.forEach((l,i)=>{if(S.levels[l.id])t=i});return t}
 function enterLevel(L,theme,music,opts){
   K.startLevel(L,opts);
   R.setTheme(theme);R.clearHub();R.buildLevel(G,{ghost:opts.ghost});
@@ -39,18 +40,20 @@ app.play=function(id,mode='story'){
   const skipCage=def.friend&&S.friends.includes(def.friend);
   const ghost=mode==='time'&&S.ghosts[id]?K.ghostDecode(S.ghosts[id]):null;
   const th=K.WORLDS[def.world].theme;
-  enterLevel(L,th,def.boss?(def.boss==='king'?'king':'boss'):th.music,{mode,abil:abilities(),skipCage,ghost});
+  const story=K.LEVELS.filter(l=>!l.boss),tier=story.indexOf(def);
+  const chase=def.boss?null:{tier,look:def.world,speed:1.04+tier*.015,lunge:def.world>=1?Math.max(300,620-tier*35):0};
+  enterLevel(L,th,def.boss?(def.boss==='king'?'king':'boss'):th.music,{mode,abil:abilities(),skipCage,ghost,chase,trapTier:def.boss?-1:tier});
   if(mode==='time')UI.toast(ghost?'Обгоните своего призрака!':'Первый забег на время — призрак появится в следующий раз');
 };
 app.playDaily=function(){
   cur={id:'daily',mode:'daily'};const seed=K.dailySeed();
   const L=K.buildProcedural(seed,18,false);const th=K.WORLDS[seed%3].theme;
-  enterLevel(L,th,th.music,{mode:'daily',abil:ALL});UI.banner('Испытание дня',K.dailyKey().split('-').reverse().join('.'));
+  enterLevel(L,th,th.music,{mode:'daily',abil:ALL,chase:{tier:4,look:seed%3,speed:1.1,lunge:520},trapTier:Math.max(0,bestTrap())});UI.banner('Испытание дня',K.dailyKey().split('-').reverse().join('.'));
 };
 app.playEndless=function(){
   cur={id:'endless',mode:'endless'};const seed=(Math.random()*1e9)|0;
   const L=K.buildProcedural(seed,70,true);const th=K.WORLDS[seed%3].theme;
-  enterLevel(L,th,th.music,{mode:'endless',abil:ALL});UI.banner('Бесконечная ночь','Беги, пока есть сердца');
+  enterLevel(L,th,th.music,{mode:'endless',abil:ALL,chase:{tier:3,look:seed%3,speed:1.08,lunge:560},trapTier:Math.max(0,bestTrap())});UI.banner('Бесконечная ночь','Беги, пока есть сердца');
 };
 app.toHub=function(t){
   cur=null;app.platformGameplay(false);UI.hudShow(false);
@@ -58,6 +61,7 @@ app.toHub=function(t){
   R.setTheme(K.HUB_THEME);R.setSkin(S.skin);R.buildHub(G,S.friends);
   A.play('hub');UI.hub(t);
 };
+function withStory(id,go){const key={'1-1':'intro','2-1':'world2','3-1':'world3'}[id];S.seen=S.seen||{};if(key&&!S.seen[key]){S.seen[key]=true;persist();UI.story(key,0,go)}else go()}
 function restart(){if(!cur)return;if(cur.mode==='daily')app.playDaily();else if(cur.mode==='endless')app.playEndless();else app.play(cur.id,cur.mode)}
 function pause(){if(G.state==='play'&&cur){G.state='pause';UI.pause();app.platformGameplay(false)}else if(G.state==='pause')resume()}
 function resume(){if(G.state==='pause'||G.state==='rescue'){G.state='play';UI.hide();K.input.taps.jump=0;app.platformGameplay(true)}}
@@ -128,7 +132,9 @@ app.act=function(a,d){
     case 'title':UI.title();break;
     case 'tab':R.setSkin(S.skin);UI.setTab(d.tab);break;
     case 'level':UI.levelIntro(d.id);break;
-    case 'play':app.play(d.id,'story');break;
+    case 'play':withStory(d.id,()=>app.play(d.id,'story'));break;
+    case 'storyNext':UI.storyNext(false);break;
+    case 'storySkip':UI.storyNext(true);break;
     case 'time':app.play(d.id,'time');break;
     case 'hub':if(pendingEnding){pendingEnding=false;app.toHub();UI.ending();break}app.toHub();break;
     case 'resume':resume();break;
@@ -198,7 +204,7 @@ if(/yandex|playhop/.test(location.hostname)||/[?&]yandex/.test(location.search))
 /* ---------- ввод ---------- */
 const inp=K.input;
 const KEYS={ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right',ArrowUp:'jump',KeyW:'jump',Space:'jump',KeyZ:'jump',
-  ShiftLeft:'dash',ShiftRight:'dash',KeyJ:'dash',KeyC:'dash',KeyX:'paw',KeyK:'paw'};
+  ShiftLeft:'dash',ShiftRight:'dash',KeyJ:'dash',KeyX:'paw',KeyK:'paw',KeyC:'trap',KeyE:'trap',KeyL:'trap'};
 addEventListener('keydown',e=>{
   A.unlock();
   if(e.code==='KeyM'){A.toggleMusic();UI.toast(A.music?'Музыка включена':'Музыка выключена');return}
@@ -211,10 +217,10 @@ addEventListener('keydown',e=>{
   inp[k]=true;
 });
 addEventListener('keyup',e=>{const k=KEYS[e.code];if(k)inp[k]=false});
-addEventListener('blur',()=>{inp.left=inp.right=inp.jump=inp.dash=inp.paw=false});
+addEventListener('blur',()=>{inp.left=inp.right=inp.jump=inp.dash=inp.paw=inp.trap=false});
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&G.state==='play'&&cur)pause()});
 addEventListener('pointerdown',()=>A.unlock(),{capture:true});
-[['tL','left'],['tR','right'],['tJ','jump'],['tDash','dash'],['tPaw','paw']].forEach(([id,k])=>{
+[['tL','left'],['tR','right'],['tJ','jump'],['tDash','dash'],['tPaw','paw'],['tTrap','trap']].forEach(([id,k])=>{
   const b=$(id);
   const on=e=>{e.preventDefault();A.unlock();if(!inp[k])inp.taps[k]=1;inp[k]=true;b.classList.add('on');try{b.setPointerCapture(e.pointerId)}catch(_){}};
   const off=()=>{inp[k]=false;b.classList.remove('on')};
@@ -227,10 +233,10 @@ let padPrev={};
 function pollPad(){
   const pads=navigator.getGamepads?navigator.getGamepads():[];const gp=pads&&[...pads].find(p=>p&&p.connected);if(!gp)return;
   const bt=i=>!!(gp.buttons[i]&&gp.buttons[i].pressed);const ax=gp.axes[0]||0;
-  const st={left:ax<-.35||bt(14),right:ax>.35||bt(15),jump:bt(0),dash:bt(1)||bt(5)||bt(7),paw:bt(2)||bt(4)||bt(6),start:bt(9)};
+  const st={left:ax<-.35||bt(14),right:ax>.35||bt(15),jump:bt(0),dash:bt(1)||bt(5)||bt(7),paw:bt(2)||bt(4)||bt(6),trap:bt(3),start:bt(9)};
   if(st.start&&!padPrev.start&&cur)pause();
   if(UI.visible()&&st.jump&&!padPrev.jump){const b=document.querySelector('#screen [autofocus], #screen .btn');if(b)b.click()}
-  if(G.state==='play'&&!UI.visible())for(const k of ['left','right','jump','dash','paw']){if(st[k]&&!padPrev[k])inp.taps[k]=1;if(st[k]!==padPrev[k])inp[k]=st[k]}
+  if(G.state==='play'&&!UI.visible())for(const k of ['left','right','jump','dash','paw','trap']){if(st[k]&&!padPrev[k])inp.taps[k]=1;if(st[k]!==padPrev[k])inp[k]=st[k]}
   padPrev=st;
 }
 
@@ -241,7 +247,7 @@ function loop(now){
   pollPad();
   if(G.state==='play'){acc+=dt;while(acc>=1/60){K.step();drain();acc-=1/60;if(G.state!=='play'){acc=0;break}}}else acc=0;
   drain();
-  if(cur)UI.hud();
+  if(cur){UI.hud();UI.hudFast()}
   R.frame(dt,now);
   requestAnimationFrame(loop);
 }

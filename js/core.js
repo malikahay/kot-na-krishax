@@ -6,7 +6,7 @@ const T=K.T, ROWS=K.ROWS;
 const G=K.G={state:'idle'};
 const ev=K.events=[];
 const emit=(t,o={})=>{o.t=t;ev.push(o);return o};
-K.input={left:false,right:false,jump:false,dash:false,paw:false,taps:{jump:0,dash:0,paw:0}};
+K.input={left:false,right:false,jump:false,dash:false,paw:false,trap:false,taps:{jump:0,dash:0,paw:0,trap:0}};
 
 const EN={walker:{w:12,h:12,sp:.5},hopper:{w:12,h:13,sp:.6},bat:{w:12,h:9,sp:0},shooter:{w:14,h:14,sp:0},armored:{w:14,h:13,sp:.35}};
 
@@ -38,6 +38,20 @@ K.startLevel=function(L,opts){
   G.goal=L.goal?{x:L.goal.col*T,y:0,w:T,h:L.goal.top*T,dy:L.goal.top*T-32}:null;
   G.boss=L.boss?makeBoss(L.boss):null;
   G.broken=[];
+  // вещи для спасения
+  G.items=(L.items||[]).map(i=>({...i,got:false}));
+  G.need=Object.assign({},(L.def&&L.def.need)||{});G.have={key:0,rope:0,cutter:0};
+  if(!G.cage)G.need={};
+  // ловушки
+  const tier=opts.trapTier??-1;G.trapDef=tier>=0?K.TRAPS[Math.min(K.TRAPS.length-1,tier)]:null;
+  G.trapTier=tier;G.trapsLeft=G.trapDef?G.trapDef.charges:0;G.traps=[];G.trapCd=0;
+  // преследователь
+  G.chase=opts.chase?{tier:opts.chase.tier,look:opts.chase.look,speed:opts.chase.speed,lunge:opts.chase.lunge,trail:[],idx:0,on:false,stun:0,boost:0,lungeT:opts.chase.lunge||0,warn:0,x:G.P.x-40,y:G.P.y,face:1,gap:999,bites:0,trapped:0}:null;
+  if(G.chase)G.chase.trail.push([G.P.x,G.P.y]);
+  // берлога
+  G.drips=(L.drips||[]).map(d=>({x:d.col*T+4,y:d.row*T,y0:d.row*T,w:8,h:14,st:'hang',t:0,vy:0}));
+  G.geysers=(L.geysers||[]).map(g=>({x:g.col*T+2,y:g.top*T-64,w:12,h:64,phase:g.phase,on:false,warn:false}));
+  G.darks=L.darks||[];
   emit('start');
 };
 
@@ -129,6 +143,7 @@ function fell(){
   G.lives--;G.dmg++;emit('fall',{x:P.x+6,y:P.y});
   if(G.lives<=0){die();return}
   P.x=P.safe.x;P.y=P.safe.y;P.vx=P.vy=0;P.inv=100;P.dash=0;P.ride=null;
+  if(G.chase){G.chase.trail.push([P.x,P.y]);G.chase.idx=Math.max(G.chase.idx-60,0)}
 }
 function die(){G.state='dead';G.deaths++;emit('dead')}
 K.continueRun=function(){
@@ -136,6 +151,7 @@ K.continueRun=function(){
   P.x=P.check.x;P.y=P.check.y;P.vx=P.vy=0;P.inv=120;P.dash=0;P.ride=null;P.safe={...P.check};
   if(G.abil.has('shield'))P.shield=true;
   if(G.boss){G.boss.hp=Math.min(G.boss.maxHp,G.boss.hp+1);G.shots.length=0}
+  if(G.chase){const C=G.chase;C.trail.push([P.x,P.y]);C.idx=Math.max(0,C.trail.length-1-260);C.stun=90}
   emit('continue');
 };
 
@@ -184,6 +200,7 @@ K.step=function(){
     if(dir&&P.lock===0){P.vx+=dir*(P.onGround?.3:.24);P.face=dir}
     else if(!dir){P.vx*=P.onGround?.74:.93;if(Math.abs(P.vx)<.05)P.vx=0}
     if(Math.abs(P.vx)>maxV)P.vx=Math.sign(P.vx)*Math.max(maxV,Math.abs(P.vx)*.9);
+    if(P.slimed){P.vx=Math.max(-.8,Math.min(.8,P.vx))}
   }
 
   // прыжки
@@ -191,7 +208,7 @@ K.step=function(){
   P.coyote=P.onGround?6:Math.max(0,P.coyote-1);
   if(P.buffer>0){
     P.buffer--;
-    if(P.coyote>0){P.vy=-6.2;P.coyote=0;P.buffer=0;P.onGround=false;P.ride=null;emit('jump',{x:P.x+6,y:P.y+P.h})}
+    if(P.coyote>0){P.vy=P.slimed?-4.4:-6.2;P.coyote=0;P.buffer=0;P.onGround=false;P.ride=null;emit('jump',{x:P.x+6,y:P.y+P.h})}
     else if(A.has('wall')&&P.wallDir&&!P.onGround){
       P.vy=-5.9;P.vx=-P.wallDir*2.7;P.face=-P.wallDir;P.lock=10;P.buffer=0;P.airJumps=1;P.canDash=true;
       emit('walljump',{x:P.x+6+P.wallDir*6,y:P.y+7,dir:P.wallDir});
@@ -241,6 +258,15 @@ K.step=function(){
   if(P.onGround&&!P.ride&&P.inv===0&&G.frame%15===0&&!nearHazard())P.safe={x:P.x,y:P.y};
   if(G.mode==='endless')G.distance=Math.max(G.distance,Math.floor(P.x/T));
 
+  // ловушка
+  if(G.trapCd>0)G.trapCd--;
+  if(taps.trap&&G.trapDef){
+    if(G.trapsLeft>0&&P.onGround&&G.trapCd===0&&G.chase){G.trapsLeft--;G.trapCd=30;G.traps.push({x:P.x-2,y:P.y+P.h-8,w:16,h:8,armed:true,t:0,tier:G.trapTier});emit('trapSet',{x:P.x+6,y:P.y+P.h})}
+    else emit('trapNo',{reason:!G.chase?'none':G.trapsLeft<=0?'empty':'air'});
+  }
+  taps.trap=0;
+  if(G.chase)updateChaser(G.chase,P);
+  if(G.state!=='play')return;
   // запись для «призрака»
   if(G.frame%2===0&&G.rec.length<40000){const yy=Math.max(0,Math.round(P.y));G.rec.push(Math.round(P.x),P.face>0?yy:-yy-1)}
 
@@ -305,6 +331,23 @@ K.step=function(){
     }
   }
   if(G.frame%60===0)G.shots=G.shots.filter(s=>!s.dead);
+  // сталактиты
+  for(const d of G.drips){
+    if(d.st==='hang'){if(Math.abs(cx-(d.x+4))<22&&P.y>d.y){d.st='shake';d.t=0;emit('dripShake',{x:d.x+4,y:d.y})}}
+    else if(d.st==='shake'){if(++d.t>22){d.st='fall';d.vy=0}}
+    else if(d.st==='fall'){d.vy=Math.min(7,d.vy+.4);d.y+=d.vy;
+      if(overlap(P,d)){hurt('drip');d.st='gone';d.t=0;emit('dripBreak',{x:d.x+4,y:d.y+12});if(G.state!=='play')return}
+      else if(solidWall(Math.floor((d.x+4)/T),Math.floor((d.y+d.h)/T))||standable(Math.floor((d.x+4)/T),Math.floor((d.y+d.h)/T))||d.y>ROWS*T){d.st='gone';d.t=0;emit('dripBreak',{x:d.x+4,y:d.y+d.h})}}
+    else if(d.st==='gone'&&++d.t>360&&Math.abs(cx-(d.x+4))>60){d.st='hang';d.y=d.y0}
+  }
+  // гейзеры огня теней
+  for(const g of G.geysers){
+    const ph=(G.frame+g.phase)%210;g.warn=ph>=120&&ph<150;const was=g.on;g.on=ph>=150;
+    if(g.on&&!was)emit('geyser',{x:g.x+6,y:g.y+64});
+    if(g.on&&overlap(P,{x:g.x,y:g.y,w:g.w,h:g.h})){hurt('fire');if(G.state!=='play')return}
+  }
+  // слизь
+  {const tx=Math.floor(cx/T),ty=Math.floor((P.y+P.h-2)/T);P.slimed=P.onGround&&tile(tx,ty)===6;}
   if(G.boss){updateBoss(G.boss,P);if(G.state!=='play')return}
 
   // звёзды, сердца, рыбки
@@ -326,8 +369,20 @@ K.step=function(){
     if(mag&&dx*dx+dy*dy<52*52){f.x+=dx*.12;f.y+=dy*.12}
     if(Math.abs(dx)<11&&Math.abs(dy)<12){f.got=true;addScore(500,f.x,f.y-8,'#ffe58a');emit('fish',{x:f.x,y:f.y})}
   }
-  // клетка с другом
-  if(G.cage&&!G.cage.open&&overlap(P,G.cage)){
+  // вещи для спасения
+  for(const it of G.items){
+    if(it.got)continue;const dx=cx-it.x,dy=cy-it.y;
+    if(mag&&dx*dx+dy*dy<52*52){it.x+=dx*.12;it.y+=dy*.12}
+    if(Math.abs(dx)<11&&Math.abs(dy)<12){it.got=true;
+      if(it.type==='kit'){G.trapsLeft++;emit('kit',{x:it.x,y:it.y})}
+      else{G.have[it.type]++;emit('item',{x:it.x,y:it.y,type:it.type,have:G.have[it.type],need:G.need[it.type]||0})}
+      addScore(150,it.x,it.y-8,'#ffe08a')}
+  }
+  // клетка с другом: открывается, только когда собраны все вещи
+  if(G.cage&&!G.cage.open&&overlap(P,G.cage)&&!K.cageReady()){
+    if(!G.cage.msgT||G.frame-G.cage.msgT>150){G.cage.msgT=G.frame;emit('cageLocked',{missing:K.cageMissing()})}
+  }
+  else if(G.cage&&!G.cage.open&&overlap(P,G.cage)){
     G.cage.open=true;const fr=K.FRIEND[G.cage.friend];G.abil.add(fr.abil);
     if(fr.abil==='heart'){G.maxLives++;G.lives++}
     if(fr.abil==='shield')P.shield=true;
@@ -347,6 +402,43 @@ function breakTiles(hb){
   const x0=Math.floor(hb.x/T),x1=Math.floor((hb.x+hb.w)/T),y0=Math.floor(hb.y/T),y1=Math.floor((hb.y+hb.h)/T);
   for(let ty=y0;ty<=y1;ty++)for(let tx=x0;tx<=x1;tx++){
     if(ty>=0&&ty<ROWS&&tx>=0&&tx<G.L.w&&G.g[ty][tx]===4){G.g[ty][tx]=0;G.broken.push([tx,ty]);emit('break',{tx,ty,x:tx*T+8,y:ty*T+8});G.score+=5}
+  }
+}
+
+/* ---------- вещи и клетка ---------- */
+K.cageMissing=function(){const m={};for(const k in G.need){const d=G.need[k]-(G.have[k]||0);if(d>0)m[k]=d}return m};
+K.cageReady=function(){return Object.keys(K.cageMissing()).length===0};
+
+/* ---------- преследователь: бежит точно по следу кота ---------- */
+function updateChaser(C,P){
+  const tr=C.trail,last=tr[tr.length-1];
+  if(Math.abs(P.x-last[0])+Math.abs(P.y-last[1])>.8)tr.push([P.x,P.y]);
+  if(!C.on){if(G.frame>150){C.on=true;C.idx=0;emit('chaserStart',{name:K.CHASERS[C.look].name})}else return}
+  if(C.stun>0){C.stun--;if(C.stun===0)emit('chaserFree',{x:C.x,y:C.y})}
+  else{
+    let sp=C.speed;
+    if(C.lunge){if(--C.lungeT<=0){if(C.warn===0){C.warn=45;emit('chaserHowl',{x:C.x,y:C.y})}}
+      if(C.warn>0&&--C.warn===0){C.boost=34;C.lungeT=C.lunge}}
+    if(C.boost>0){C.boost--;sp*=2.3}
+    C.idx=Math.min(tr.length-1,C.idx+sp);
+  }
+  const i=Math.floor(C.idx),p=tr[i],q=tr[Math.min(tr.length-1,i+1)],f=C.idx-i;
+  const nx=p[0]+(q[0]-p[0])*f,ny=p[1]+(q[1]-p[1])*f;
+  if(Math.abs(nx-C.x)>.05)C.face=nx>C.x?1:-1;C.x=nx;C.y=ny;
+  C.gap=tr.length-1-C.idx;
+  // ловушки
+  for(const t of G.traps){
+    if(!t.armed)continue;
+    if(C.stun===0&&Math.abs((C.x+6)-(t.x+8))<12&&Math.abs((C.y+P.h)-(t.y+8))<14){
+      t.armed=false;const d=K.TRAPS[t.tier];C.stun=d.stun;C.idx=Math.max(0,C.idx-d.back);C.boost=0;C.warn=0;C.trapped++;
+      G.score+=150;emit('trapSnap',{x:t.x+8,y:t.y,tier:t.tier});emit('pop',{x:t.x+8,y:t.y-10,text:'Попался! +150',col:'#7ff7c8',big:true});
+    }
+    for(const e of G.enemies)if(e.alive&&t.armed&&e.type!=='bat'&&overlap(e,t)){t.armed=false;killEnemy(e,'smash')}
+  }
+  // укус
+  if(C.stun===0&&C.on&&Math.abs(C.x-P.x)<12&&Math.abs(C.y-P.y)<14){
+    if(P.dash>0){C.stun=60;C.idx=Math.max(0,C.idx-60);emit('chaserBonk',{x:C.x+6,y:C.y})}
+    else if(P.inv===0&&!(G.state!=='play')){C.bites++;emit('chaserBite',{x:P.x+6,y:P.y+7});hurt('chaser');C.idx=Math.max(0,C.idx-170);C.stun=40}
   }
 }
 
