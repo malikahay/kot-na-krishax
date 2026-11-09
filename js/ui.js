@@ -128,7 +128,8 @@ function chPane(){
 }
 function setPane(){
   const A=K.audio;
-  return `<div class="toggle" data-act="music" role="switch" aria-checked="${A.music}"><span>Музыка</span><span class="sw2 ${A.music?'on':''}"></span></div>
+  const O=K.app.save.opts||{};
+  return `<h3>Игра</h3>${optRows(O)}<h3 style="margin-top:16px">Звук</h3><div class="toggle" data-act="music" role="switch" aria-checked="${A.music}"><span>Музыка</span><span class="sw2 ${A.music?'on':''}"></span></div>
   <div class="toggle" data-act="sfx" role="switch" aria-checked="${A.sfx}"><span>Звуки</span><span class="sw2 ${A.sfx?'on':''}"></span></div>
   <h3 style="margin-top:16px">Управление</h3>
   <div class="kv"><span>Бег</span><span><kbd>←</kbd> <kbd>→</kbd> / <kbd>A</kbd> <kbd>D</kbd></span></div>
@@ -144,6 +145,11 @@ function setPane(){
     <button class="btn sm ghost" data-act="title">На титул</button>
     <button class="btn sm ghost" data-act="reset">Сбросить прогресс</button></div>`;
 }
+function optRows(O){const dog=O.dog||'normal';
+  return `<div class="kv"><span>Пёс-преследователь</span><span class="seg">${[['normal','Обычный'],['easy','Лёгкий'],['off','Выкл']].map(([v,n])=>`<button class="${dog===v?'on':''}" data-act="optdog" data-v="${v}">${n}</button>`).join('')}</span></div>
+  <div class="toggle" data-act="optfriends" role="switch" aria-checked="${O.friends!==false}"><span>Друзья бегут рядом с котом</span><span class="sw2 ${O.friends!==false?'on':''}"></span></div>
+  <p class="sub">Лёгкий пёс бегает медленнее и не отнимает сердца.</p>`}
+U.optRows=optRows;
 U.refreshPane=function(){const p=$('pane');if(!p){U.hub();return}U.hub()};
 U.setTab=t=>{tab=t;U.hub()};
 U.setShop=(c,s)=>{if(c)shopCat=c;shopSel=s;U.hub()};
@@ -266,7 +272,8 @@ U.levelIntro=function(id){
 U.pause=function(){
   show(`<div class="card"><h2>Пауза</h2>
     <div class="row"><button class="btn" data-act="resume" autofocus>Продолжить</button><button class="btn ghost" data-act="restart">Заново</button><button class="btn ghost" data-act="hub">Домой</button></div>
-    <div class="row"><button class="btn sm ghost" data-act="music">${K.audio.music?'Музыка: вкл':'Музыка: выкл'}</button><button class="btn sm ghost" data-act="sfx">${K.audio.sfx?'Звуки: вкл':'Звуки: выкл'}</button></div></div>`);
+    <div class="row"><button class="btn sm ghost" data-act="music">${K.audio.music?'Музыка: вкл':'Музыка: выкл'}</button><button class="btn sm ghost" data-act="sfx">${K.audio.sfx?'Звуки: вкл':'Звуки: выкл'}</button></div>
+    <div style="width:100%;text-align:left">${optRows(K.app.save.opts||{})}</div></div>`);
 };
 U.gameOver=function(mode){
   const G=K.G;
@@ -397,7 +404,7 @@ U.onEvent=function(e){
     case 'item':U.toast(`${K.ITEMS[e.type].name}: ${e.have}/${e.need}`,itemPic(e.type,26));if(K.cageReady())setTimeout(()=>U.banner('Всё собрано!','Бегите к клетке'),600);break;
     case 'kit':U.toast('+1 ловушка',itemPic('kit',26));break;
     case 'fishLocked':{const g=K.ABIL_FRIEND[e.gate];if(g)U.banner('Золотая рыбка под замком',`Нужно умение «${g.abilName}» (${g.name}). Вернитесь сюда, когда спасёте друга`);break}
-    case 'hint':{const h={double:['Двойной прыжок!','Нажмите прыжок ещё раз прямо в воздухе'],wall:['Прыжок от стены!','Прыгните к стене и жмите прыжок, касаясь её'],glide:['Планируйте!','Удерживайте прыжок, пока падаете']}[e.k];if(h)U.banner(h[0],h[1]);break}
+    case 'hint':{const h={double:['Двойной прыжок!','Нажмите прыжок ещё раз прямо в воздухе'],wall:['Прыжок от стены!','Прыгните к стене и жмите прыжок, касаясь её'],paw:['Удар лапой!',matchMedia('(pointer:coarse)').matches?'Нажмите «ЛАПА» у треснувшей стены':'Нажмите X у треснувшей стены, чтобы её сломать'],glide:['Планируйте!','Удерживайте прыжок, пока падаете']}[e.k];if(h)U.banner(h[0],h[1]);break}
     case 'chaserWake':U.toast('В будке кто-то проснулся…',pic('dog',K.G.chase?K.G.chase.look:0,26));break;
     case 'cageLocked':U.banner('Клетка заперта','Не хватает: '+Object.entries(e.missing).map(([k,n])=>`${K.ITEMS[k].name.toLowerCase()} ×${n}`).join(', ')+'. Вернитесь и поищите');break;
     case 'chaserStart':U.banner(`${e.name} идёт по следу!`,K.G.trapDef?`Ставьте ловушки: ${matchMedia('(pointer:coarse)').matches?'кнопка «Ловушка»':'клавиша C'}`:'Не останавливайтесь!');break;

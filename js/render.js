@@ -572,6 +572,8 @@ R.breakTile=function(tx,ty){const k=tx+','+ty,m=ents.cracks&&ents.cracks.get(k);
   for(let i=0;i<14;i++)part(tx+.5+(Math.random()-.5)*.8,ROWS-ty-.5+(Math.random()-.5)*.8,{vx:(Math.random()-.5)*.12,vy:Math.random()*.12,vz:(Math.random()-.2)*.1,life:40,max:40,col:0xc8a088,grav:-.008,big:true})};
 const FLY={crow:1,owl:1,firefly:1};
 function addFollower(id,from){if(followers.some(f=>f.userData.kind===id))return;const f=buildFriend(id);f.userData.fly=!!FLY[id];f.position.copy(from||cat.position);if(!from)f.position.x-=1+followers.length;scene.add(f);followers.push(f)}
+R.setFollowers=function(ids){followers.forEach(f=>scene.remove(f));followers=[];ids.forEach(id=>addFollower(id,null))};
+R.dropChaser=function(){if(ents.chaser){LG.remove(ents.chaser);ents.chaser=null}};
 R.showFollower=function(id){addFollower(id,ents.cage?ents.cage.g.position.clone().add(new THREE.Vector3(0,.6,0)):null)};
 
 /* Дом на крыше: друзья гуляют вокруг */

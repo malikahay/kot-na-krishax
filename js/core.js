@@ -46,7 +46,7 @@ K.startLevel=function(L,opts){
   const tier=opts.trapTier??-1;G.trapDef=tier>=0?K.TRAPS[Math.min(K.TRAPS.length-1,tier)]:null;
   G.trapTier=tier;G.trapsLeft=G.trapDef?G.trapDef.charges:0;G.traps=[];G.trapCd=0;
   // преследователь
-  G.chase=opts.chase?{tier:opts.chase.tier,look:opts.chase.look,speed:opts.chase.speed,lunge:opts.chase.lunge,trail:[],idx:0,on:false,stun:0,boost:0,lungeT:opts.chase.lunge||0,warn:0,x:G.P.x-40,y:G.P.y,face:1,gap:999,bites:0,trapped:0}:null;
+  G.chase=opts.chase?{easy:!!opts.chase.easy,tier:opts.chase.tier,look:opts.chase.look,speed:opts.chase.speed,lunge:opts.chase.lunge,trail:[],idx:0,on:false,stun:0,boost:0,lungeT:opts.chase.lunge||0,warn:0,x:G.P.x-40,y:G.P.y,face:1,gap:999,bites:0,trapped:0}:null;
   if(G.chase){const C=G.chase;C.kennel={x:G.P.x-30,y:G.P.y};C.x=C.kennel.x;C.y=C.kennel.y;C.trail.push([C.kennel.x,C.kennel.y]);C.wake=false}
   G.hinted={};G.wallPush=0;
   // берлога
@@ -70,7 +70,7 @@ function spawnEnemy(e){
 function tile(tx,ty){
   const L=G.L;
   if(tx<0||tx>=L.w)return 1;
-  if(ty<0){return G.g[0][tx]===4?4:0}
+  if(ty<0)return 0;
   if(ty>=ROWS)return 0;
   return G.g[ty][tx];
 }
@@ -244,6 +244,7 @@ K.step=function(){
   const fallV=P.vy;
   P.bonk=false;
   moveY(P);
+  if(P.y<0){P.y=0;if(P.vy<0)P.vy=0}
   if(!P.onGround){P.ride=null;landOnPlatforms(P)}else P.ride=null;
     // стены рядом (для прыжков от стен)
   P.wallDir=0;
@@ -258,7 +259,7 @@ K.step=function(){
   if(P.inv>0)P.inv--;
   // подсказки к умениям: показываются один раз, когда упираешься в препятствие
   if(P.onGround&&dir){const ft=Math.floor((dir>0?P.x+P.w+2:P.x-2)/T),r0=Math.floor((P.y+P.h-1)/T);let h=0;while(h<7&&solidWall(ft,r0-h))h++;
-    if(h>=3){G.wallPush++;if(G.wallPush>12){const k=A.has('wall')&&h>=6?'wall':A.has('double')&&h>=3?'double':null;if(k&&!G.hinted[k]){G.hinted[k]=1;emit('hint',{k})}}}else G.wallPush=0}
+    if(h>=3){G.wallPush++;if(G.wallPush>12){const crack=tile(ft,r0)===4||tile(ft,r0-1)===4;const k=crack&&A.has('paw')?'paw':crack?null:A.has('wall')&&h>=6?'wall':A.has('double')&&h>=3?'double':null;if(k&&!G.hinted[k]){G.hinted[k]=1;emit('hint',{k})}}}else G.wallPush=0}
   if(P.onGround&&A.has('double')&&!G.hinted.double&&dir>0){const c0=Math.floor((P.x+P.w+4)/T),r0=Math.floor((P.y+P.h+2)/T);let pit=0;for(let k=0;k<5;k++){let any=false;for(let r=r0-2;r<ROWS;r++)if(standable(c0+k,r)){any=true;break}if(!any)pit++;else break}if(pit>=4){G.hinted.double=1;emit('hint',{k:'double'})}}
   if(!P.onGround&&P.vy>2&&A.has('glide')&&!G.hinted.glide&&!standable(Math.floor(cx/T),Math.floor((P.y+P.h+40)/T))&&P.y>4*T){let pit=true;for(let r=Math.floor((P.y+P.h)/T);r<ROWS;r++)if(standable(Math.floor(cx/T),r))pit=false;if(pit){G.hinted.glide=1;emit('hint',{k:'glide'})}}
   if(P.onGround&&!P.ride&&P.inv===0&&G.frame%15===0&&!nearHazard())P.safe={x:P.x,y:P.y};
@@ -430,7 +431,7 @@ function updateChaser(C,P){
       if(C.warn>0&&--C.warn===0){C.boost=34;C.lungeT=C.lunge}}
     if(C.boost>0){C.boost--;sp*=2.3}
     // пёс не отстаёт: если след слишком длинный, он мчится вдогонку и держится рядом
-    const gap=tr.length-1-C.idx;if(gap>75)sp=Math.max(sp,1.25+Math.min(1.4,(gap-75)/60));
+    const gap=tr.length-1-C.idx,far=C.easy?120:75;if(gap>far)sp=Math.max(sp,(C.easy?1.1:1.25)+Math.min(1.4,(gap-far)/60));
     C.idx=Math.min(tr.length-1,C.idx+sp);
   }
   const i=Math.floor(C.idx),p=tr[i],q=tr[Math.min(tr.length-1,i+1)],f=C.idx-i;
@@ -449,7 +450,7 @@ function updateChaser(C,P){
   // укус
   if(C.stun===0&&C.on&&Math.abs(C.x-P.x)<12&&Math.abs(C.y-P.y)<14){
     if(P.dash>0){C.stun=60;C.idx=Math.max(0,C.idx-60);emit('chaserBonk',{x:C.x+6,y:C.y})}
-    else if(P.inv===0&&!(G.state!=='play')){C.bites++;emit('chaserBite',{x:P.x+6,y:P.y+7});hurt('chaser');C.idx=Math.max(0,C.idx-90);C.stun=45}
+    else if(P.inv===0&&!(G.state!=='play')){C.bites++;emit('chaserBite',{x:P.x+6,y:P.y+7});if(C.easy){P.inv=90;P.vy=-4;P.vx=P.face*2.5;C.idx=Math.max(0,C.idx-150);C.stun=200}else{hurt('chaser');C.idx=Math.max(0,C.idx-90);C.stun=45}}
   }
 }
 

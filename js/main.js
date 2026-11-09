@@ -8,7 +8,7 @@ const ALL=K.FRIENDS.map(f=>f.abil);
 
 /* ---------- сохранение ---------- */
 const SAVE_KEY='kot-save-v2';
-function defaults(){return {wallet:0,levels:{},friends:[],owned:[],skin:{color:'ginger',hat:'none',tail:'normal'},daily:{},endless:{dist:0,score:0},ghosts:{},seenIntro:false,king:false}}
+function defaults(){return {opts:{dog:'normal',friends:true},wallet:0,levels:{},friends:[],owned:[],skin:{color:'ginger',hat:'none',tail:'normal'},daily:{},endless:{dist:0,score:0},ghosts:{},seenIntro:false,king:false}}
 let S;
 try{S=Object.assign(defaults(),JSON.parse(localStorage.getItem(SAVE_KEY)||'{}'))}catch(e){S=defaults()}
 app.save=S;
@@ -26,8 +26,9 @@ app.currentPar=()=>cur&&G.L?G.L.par:0;
 function abilities(){return S.friends.map(id=>K.FRIEND[id].abil)}
 function bestTrap(){const story=K.LEVELS.filter(l=>!l.boss);let t=0;story.forEach((l,i)=>{if(S.levels[l.id])t=i});return t}
 function enterLevel(L,theme,music,opts){
+  const O=S.opts||{};if(opts.chase){if(O.dog==='off')opts.chase=null;else if(O.dog==='easy')opts.chase={...opts.chase,easy:true,speed:opts.chase.speed*.85,lunge:0}}
   K.startLevel(L,opts);
-  R.setTheme(theme);R.clearHub();R.buildLevel(G,{ghost:opts.ghost,followers:L.arena?[]:S.friends.slice(-3)});
+  R.setTheme(theme);R.clearHub();R.buildLevel(G,{ghost:opts.ghost,followers:L.arena||(S.opts&&S.opts.friends===false)?[]:S.friends.slice(-3)});
   A.play(music);A.setIntensity(0);
   UI.hide();UI.hudShow(true);UI.bossBar(null);
   K.input.left=K.input.right=K.input.jump=false;
@@ -146,6 +147,8 @@ app.act=function(a,d){
     case 'buy':{const c=UI.shopState().cat,it=K.SKINS[c].find(i=>i.id===d.id);
       if(it&&it.price&&S.wallet>=it.price&&!owned(c,it.id)){S.wallet-=it.price;S.owned.push(c+':'+it.id);S.skin[c]=it.id;persist();A.sfxPlay('buy');R.setSkin(S.skin);UI.setShop(c,it.id);UI.toast(`Куплено: ${it.name}`)}
       else A.sfxPlay('deny');break}
+    case 'optdog':S.opts=S.opts||{};S.opts.dog=d.v;persist();if(G.chase&&cur){if(d.v==='off'){G.chase=null;R.dropChaser()}else{G.chase.easy=d.v==='easy'}}if(G.state==='pause')UI.pause();else UI.hub();UI.toast(d.v==='off'?'Пёс выключен — с нового уровня или перезапуска его не будет':d.v==='easy'?'Пёс теперь лёгкий':'Пёс обычный');break;
+    case 'optfriends':S.opts=S.opts||{};S.opts.friends=S.opts.friends===false;persist();R.setFollowers(S.opts.friends&&cur&&!G.L.arena?S.friends.slice(-3):[]);if(G.state==='pause')UI.pause();else UI.hub();break;
     case 'music':A.toggleMusic();if(G.state==='pause')UI.pause();else UI.hub();break;
     case 'sfx':A.toggleSfx();if(G.state==='pause')UI.pause();else UI.hub();break;
     case 'daily':UI.fadeTo(()=>app.playDaily());break;
