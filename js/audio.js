@@ -101,7 +101,8 @@ const S={
   trapSet(){noise({f:1800,ft:'bandpass',dur:.06,vol:.12});tone({type:'square',f:300,f2:180,dur:.08,vol:.08,lp:1500})},
   trapNo(){tone({type:'square',f:180,f2:140,dur:.12,vol:.06,lp:800})},
   trapSnap(){noise({f:3000,f2:400,dur:.18,vol:.3,ft:'bandpass',q:1.5});tone({type:'square',f:900,f2:200,dur:.15,vol:.12});[60,67,72].forEach((m,i)=>tone({type:'triangle',f:mtof(m),dur:.15,vol:.08,when:now()+.1+i*.06}))},
-  chaserStart(){howl(.9)},
+  chaserStart(){bark();bark(.16);howl(.9);A.setIntensity(1);setTimeout(()=>A.setIntensity(0),6000);if(musG)musG.gain.setTargetAtTime(A.music?.32:0,now(),1.5)},
+  chaserWake(){growl(1.5);A.setIntensity(1);if(musG&&A.music)musG.gain.setTargetAtTime(.48,now(),.4)},
   chaserHowl(){howl(.6)},
   chaserBite(){bark();bark(.12)},
   chaserBonk(){tone({type:'square',f:500,f2:200,dur:.15,vol:.1});bark()},
@@ -115,6 +116,7 @@ const S={
 A.sfxPlay=function(name,e={}){if(!A.ready||!A.sfx||!S[name])return;try{S[name](e)}catch(err){}};
 
 function howl(len){tone({type:'sawtooth',f:300,f2:520,dur:len,vol:.09,lp:1400,vib:6,vibAmt:18,attack:.08,slide:len*.5,send:true});tone({type:'sawtooth',f:305,f2:510,dur:len,vol:.05,lp:1200,vib:5,vibAmt:14,attack:.1,slide:len*.5})}
+function growl(len){const t=now();const o=ctx.createOscillator(),g=ctx.createGain(),f=ctx.createBiquadFilter(),l=ctx.createOscillator(),lg=ctx.createGain();o.type='sawtooth';o.frequency.setValueAtTime(70,t);o.frequency.linearRampToValueAtTime(95,t+len);f.type='lowpass';f.frequency.value=420;l.frequency.value=23;lg.gain.value=18;l.connect(lg);lg.connect(o.frequency);g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.22,t+.3);g.gain.setValueAtTime(.22,t+len-.2);g.gain.exponentialRampToValueAtTime(.0001,t+len);o.connect(f);f.connect(g);g.connect(sfxG);o.start(t);l.start(t);o.stop(t+len+.05);l.stop(t+len+.05);noise({f:300,dur:len,vol:.05,ft:'lowpass',attack:.3})}
 function bark(d=0){noise({f:900,f2:300,dur:.09,vol:.2,ft:'bandpass',q:2,when:now()+d});tone({type:'sawtooth',f:260,f2:140,dur:.09,vol:.1,lp:1200,when:now()+d})}
 
 /* ---------- музыка: шаговый секвенсор с упреждающим планированием ---------- */

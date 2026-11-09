@@ -31,9 +31,10 @@ U.title=function(){
 let tab='map',shopCat='color',shopSel=null;
 U.hub=function(t){
   if(t)tab=t;
+  if(tab==='map'){U.worldMap();return}
   const S=K.app.save;
   const fishGot=Object.values(S.levels).reduce((a,l)=>a+(l.fish?1:0),0),fishAll=K.LEVELS.filter(l=>!l.boss).length;
-  const tabs=[['map','Карта'],['shop','Лавка'],['friends','Друзья'],['ch','Испытания'],['set','Настройки']];
+  const tabs=[['map','🗺 Карта'],['shop','Лавка'],['friends','Друзья'],['ch','Испытания'],['set','Настройки']];
   show(`<div class="hubui safe">
     <div class="hubtop"><h1>Кот на <span>крышах</span></h1>
       <div class="row"><span class="chip"><span class="s">★</span><b>${S.wallet}</b></span><span class="chip" title="Золотые рыбки">🐟 <b>${fishGot}/${fishAll}</b></span></div></div>
@@ -143,6 +144,71 @@ U.refreshPane=function(){const p=$('pane');if(!p){U.hub();return}U.hub()};
 U.setTab=t=>{tab=t;U.hub()};
 U.setShop=(c,s)=>{if(c)shopCat=c;shopSel=s;U.hub()};
 U.shopState=()=>({cat:shopCat,sel:shopSel});
+
+/* ---------- карта мира: дорога через город к берлоге ---------- */
+const MAPW=2600,MAPH=640;
+const NODES=[[150,470],[340,330],[560,450],[790,300],[1010,420],[1210,270],[1420,400],[1640,250],[1860,380],[2070,470],[2280,330],[2470,230]];
+function mapArt(){
+  let a=`<defs>
+    <linearGradient id="z1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0d0a26"/><stop offset="1" stop-color="#3b2868"/></linearGradient>
+    <linearGradient id="z2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#05141a"/><stop offset="1" stop-color="#1f4a48"/></linearGradient>
+    <linearGradient id="z3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#030108"/><stop offset="1" stop-color="#1e0c30"/></linearGradient>
+    <linearGradient id="fadeA" x1="0" x2="1"><stop offset="0" stop-color="#3b2868" stop-opacity="0"/><stop offset="1" stop-color="#1f4a48"/></linearGradient>
+    <radialGradient id="moon"><stop offset="0" stop-color="#fff3c4"/><stop offset=".6" stop-color="#fff3c4" stop-opacity=".25"/><stop offset="1" stop-color="#fff3c4" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect x="0" y="0" width="900" height="${MAPH}" fill="url(#z1)"/><rect x="900" y="0" width="900" height="${MAPH}" fill="url(#z2)"/><rect x="1800" y="0" width="800" height="${MAPH}" fill="url(#z3)"/>
+  <rect x="780" y="0" width="240" height="${MAPH}" fill="url(#fadeA)" opacity=".55"/>
+  <circle cx="230" cy="110" r="110" fill="url(#moon)"/><circle cx="230" cy="110" r="44" fill="#fff3c4"/><circle cx="250" cy="96" r="38" fill="#0d0a26"/>`;
+  let r=7;const R=()=>(r=r*16807%2147483647)/2147483647;
+  for(let i=0;i<120;i++){const x=R()*1800,y=R()*260;a+=`<circle cx="${x|0}" cy="${y|0}" r="${R()<.2?2:1}" fill="#fff" opacity="${.4+R()*.6}"/>`}
+  // крыши старого города
+  for(let x=-10;x<900;){const w=50+R()*90,h=120+R()*170,y=MAPH-h;a+=`<rect x="${x|0}" y="${y|0}" width="${w|0}" height="${h|0}" fill="${R()<.5?'#2b2260':'#231b55'}"/><rect x="${x|0}" y="${y|0}" width="${w|0}" height="6" fill="#8f80e0" opacity=".8"/>`;
+    for(let wy=y+18;wy<MAPH-14;wy+=22)for(let wx=x+10;wx<x+w-12;wx+=18)if(R()<.3)a+=`<rect x="${wx|0}" y="${wy|0}" width="7" height="9" fill="#ffcf6b" opacity=".8"/>`;
+    if(R()<.4)a+=`<rect x="${(x+w*.6)|0}" y="${(y-26)|0}" width="12" height="26" fill="#2b2260"/>`;x+=w+4}
+  // фабрики: трубы и дым
+  for(let x=900;x<1800;){const w=70+R()*110,h=110+R()*150,y=MAPH-h;a+=`<rect x="${x|0}" y="${y|0}" width="${w|0}" height="${h|0}" fill="${R()<.5?'#163838':'#1d4444'}"/><path d="M${x|0} ${y|0} l${(w/4)|0} -24 l0 24 l${(w/4)|0} -24 l0 24 l${(w/4)|0} -24 l0 24" fill="#1d4444"/>`;
+    const cx=x+w*.7,ch=90+R()*80;a+=`<rect x="${cx|0}" y="${(y-ch)|0}" width="16" height="${ch|0}" fill="#2a5a58"/><rect x="${(cx-2)|0}" y="${(y-ch)|0}" width="20" height="8" fill="#e85a3a" opacity=".7"/>`;
+    for(let k=0;k<3;k++)a+=`<circle cx="${(cx+8+k*14)|0}" cy="${(y-ch-14-k*20)|0}" r="${10+k*6}" fill="#9ad8d0" opacity="${.18-k*.04}"/>`;
+    for(let wy=y+16;wy<MAPH-14;wy+=24)for(let wx=x+10;wx<x+w-12;wx+=20)if(R()<.35)a+=`<rect x="${wx|0}" y="${wy|0}" width="8" height="8" fill="#8cffd2" opacity=".7"/>`;x+=w+10}
+  // берлога: вход-пасть, сталактиты, кристаллы
+  a+=`<path d="M1800 0 L2600 0 L2600 70 ${Array.from({length:16},(_,i)=>`L${1800+i*50+25} ${90+R()*90|0} L${1850+i*50} 70`).join(' ')} L1800 70Z" fill="#0b0614"/>`;
+  a+=`<path d="M1800 ${MAPH} L1800 520 Q1900 470 2000 540 Q2150 600 2300 500 Q2450 420 2600 520 L2600 ${MAPH}Z" fill="#14091f"/>`;
+  for(let i=0;i<22;i++){const x=1820+R()*760,y=180+R()*400,s=8+R()*20,c=R()<.5?'#9a6aff':'#5affd0';a+=`<path d="M${x|0} ${(y-s*1.8)|0} L${(x+s*.6)|0} ${y|0} L${x|0} ${(y+s*.5)|0} L${(x-s*.6)|0} ${y|0}Z" fill="${c}" opacity=".75"/><circle cx="${x|0}" cy="${y|0}" r="${(s*1.6)|0}" fill="${c}" opacity=".08"/>`}
+  a+=`<ellipse cx="2470" cy="270" rx="120" ry="150" fill="#000" opacity=".55"/><text x="2470" y="120" text-anchor="middle" font-size="22" fill="#d88aff" font-family="Rubik Mono One, sans-serif">ЛОГОВО</text>`;
+  // дорога
+  const d=NODES.map((p,i)=>i?`S${(NODES[i-1][0]+p[0])/2} ${p[1]+(i%2?-70:70)} ${p[0]} ${p[1]}`:`M${p[0]} ${p[1]}`).join(' ');
+  a+=`<path d="${d}" fill="none" stroke="#000" stroke-opacity=".35" stroke-width="30" stroke-linecap="round"/><path d="${d}" fill="none" stroke="#e8dcc0" stroke-opacity=".85" stroke-width="16" stroke-linecap="round" stroke-dasharray="2 22"/>`;
+  [['СТАРЫЕ КРЫШИ',450],['ФАБРИЧНЫЕ ТРУБЫ',1350],['БЕРЛОГА КОРОЛЯ',2150]].forEach(([t,x])=>a+=`<text x="${x}" y="${MAPH-24}" text-anchor="middle" font-size="26" fill="#ffd85a" opacity=".85" font-family="Rubik Mono One, sans-serif">${t}</text>`);
+  return a;
+}
+U.worldMap=function(){
+  const S=K.app.save;
+  const fishGot=Object.values(S.levels).reduce((a,l)=>a+(l.fish?1:0),0),fishAll=K.LEVELS.filter(l=>!l.boss).length;
+  let cur=K.LEVELS.findIndex(l=>K.app.unlocked(l.id)&&!S.levels[l.id]);if(cur<0)cur=K.LEVELS.length-1;
+  const nodes=K.LEVELS.map((l,i)=>{
+    const [x,y]=NODES[i],st=S.levels[l.id],open=K.app.unlocked(l.id),fr=l.friend&&K.FRIEND[l.friend],saved=fr&&S.friends.includes(fr.id);
+    const cls=['mnode',l.boss?'boss':'',st?'done':'',i===cur?'next':'',open?'':'lock'].join(' ');
+    const label=l.boss?(l.boss==='king'?'👑':'☠️'):l.id;
+    const friend=fr?`<span class="mf ${saved?'saved':''}" title="${esc(fr.name)}">${saved?fr.emoji:(open?'🔒'+fr.emoji:'❔')}</span>`:'';
+    const need=l.need&&open&&!saved?`<span class="mneed">${Object.entries(l.need).map(([k,n])=>K.ITEMS[k].icon+n).join(' ')}</span>`:'';
+    return `<button class="${cls}" style="left:${x/MAPW*100}%;top:${y/MAPH*100}%" ${open?`data-act="level" data-id="${l.id}"`:'disabled'} aria-label="${esc(l.name)}">
+      ${friend}<span class="o">${open?label:'🔒'}</span><span class="st">${open?stars3(st&&st.stars):''}</span><span class="nm">${esc(l.name)}</span>${need}</button>`;
+  }).join('');
+  const [cx,cy]=NODES[cur];
+  show(`<div class="mapui">
+    <div class="maptop safe"><button class="btn sm ghost" data-act="tab" data-tab="shop">🏠 Дом</button>
+      <h1 class="mapt">Путь к берлоге</h1>
+      <div class="row"><span class="chip"><span class="s">★</span><b>${S.wallet}</b></span><span class="chip" title="Золотые рыбки">🐟 <b>${fishGot}/${fishAll}</b></span><span class="chip" title="Спасённые друзья">${S.friends.length?S.friends.map(id=>K.FRIEND[id].emoji).join(''):'друзей пока нет'}</span></div></div>
+    <div class="mapscroll" id="mapscroll"><div class="mapc">
+      <svg viewBox="0 0 ${MAPW} ${MAPH}" preserveAspectRatio="none" aria-hidden="true">${mapArt()}</svg>
+      ${nodes}
+      <span class="mcat" style="left:${cx/MAPW*100}%;top:${cy/MAPH*100}%">🐈</span>
+      <span class="mdog" style="left:${Math.max(2,cx-90)/MAPW*100}%;top:${(cy+30)/MAPH*100}%">🐕</span>
+    </div></div>
+    <p class="maphint">Нажмите на уровень, чтобы начать. В клетках ждут друзья — для каждой клетки нужны ключи 🔑, верёвки 🪢 и кусачки ✂️.</p>
+  </div>`,'');
+  const sc=$('mapscroll');if(sc){requestAnimationFrame(()=>{const c=sc.firstElementChild;sc.scrollLeft=Math.max(0,cx/MAPW*c.offsetWidth-sc.clientWidth/2)})}
+};
 
 /* ---------- карточка уровня ---------- */
 U.levelIntro=function(id){
@@ -296,6 +362,8 @@ U.onEvent=function(e){
     case 'shieldBreak':U.toast('Щит Колючки спас вас!');break;
     case 'item':U.toast(`${K.ITEMS[e.type].icon} ${K.ITEMS[e.type].name}: ${e.have}/${e.need}`);if(K.cageReady())setTimeout(()=>U.banner('Всё собрано!','Бегите к клетке'),600);break;
     case 'kit':U.toast('🧰 +1 ловушка');break;
+    case 'hint':{const h={double:['Двойной прыжок!','Нажмите прыжок ещё раз прямо в воздухе'],wall:['Прыжок от стены!','Прыгните к стене и жмите прыжок, касаясь её'],glide:['Планируйте!','Удерживайте прыжок, пока падаете']}[e.k];if(h)U.banner(h[0],h[1]);break}
+    case 'chaserWake':U.toast('🐕 В будке кто-то проснулся…');break;
     case 'cageLocked':U.banner('Клетка заперта',Object.entries(e.missing).map(([k,n])=>`${K.ITEMS[k].icon}×${n}`).join('  ')+' — вернитесь и поищите');break;
     case 'chaserStart':U.banner(`${e.name} идёт по следу!`,K.G.trapDef?`Ставьте ловушки: ${matchMedia('(pointer:coarse)').matches?'кнопка 🪤':'клавиша C'}`:'Не останавливайтесь!');break;
     case 'chaserHowl':U.toast('🐕 Пёс готовится к рывку!');break;

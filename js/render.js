@@ -390,6 +390,25 @@ function buildChaser(look){
   g.userData={body,legs,tail,eyes:heads,dizzy:dz};
   return g;
 }
+/* Будка, где спит пёс */
+const zTex=()=>canvasTex(32,32,(c)=>{c.fillStyle='#cfc8ff';c.font='bold 26px system-ui,sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText('Z',16,17)});
+let ZT=null;
+function buildKennel(C){
+  const L=K.CHASERS[C.look],g=new THREE.Group(),house=new THREE.Group();g.add(house);
+  const wood=cmat(C.look===1?0x4a4a5a:C.look===2?0x2a1838:0x7a4a2a),roofM=cmat(C.look===1?0x8a2a2a:C.look===2?0x5a1a7a:0xa03a2a);
+  box(1.3,.95,1.1,wood,0,.475,0,house);
+  const roof=new THREE.Mesh(new THREE.ConeGeometry(1.05,.6,4),roofM);roof.rotation.y=Math.PI/4;roof.position.y=1.25;roof.scale.set(1,1,.85);roof.castShadow=true;roof.userData.ownGeo=true;house.add(roof);
+  box(.62,.66,.02,basic({color:0x05030c}),.0,.36,.56,house,false);
+  const eyes=[-.12,.12].map(x=>box(.08,.03,.02,basic({color:L.eye}),x,.5,.575,house,false));
+  const plate=canvasTex(64,24,(c,w,h)=>{c.fillStyle='#e8d8b0';c.fillRect(0,0,w,h);c.fillStyle='#3a2a1a';c.font='bold 16px system-ui,sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText(C.look===2?'ЦЕРБЕР':'ПЁС',w/2,h/2+1)});
+  const pm=new THREE.Mesh(new THREE.PlaneGeometry(.6,.22),basic({map:plate}));pm.position.set(0,.84,.565);pm.userData.ownGeo=true;house.add(pm);
+  const bowl=cyl(.16,.08,cmat(0xc83a5a),.85,.04,.35,g);
+  if(!ZT)ZT=zTex();
+  const zs=[0,1,2].map(i=>{const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:ZT,transparent:true,depthWrite:false}));sp.scale.setScalar(.35);g.add(sp);return sp});
+  g.position.set(wx(C.kennel.x+6),ROWS-(C.kennel.y+14)/T,-.35);LG.add(g);
+  return {g,house,eyes,zs};
+}
+
 /* Пещерный фон берлоги */
 function buildCaveBg(L,r){
   const rockM=std({map:stoneTex,color:0x3a3050,roughness:1}),rockM2=std({map:stoneTex,color:0x241c34,roughness:1});
@@ -403,7 +422,7 @@ function buildCaveBg(L,r){
 }
 
 /* ---------- уровень ---------- */
-let LG=null,chunks=[],ents={},cat=null,ghostCat=null,follower=null,hubFriends=[];
+let LG=null,chunks=[],ents={},cat=null,ghostCat=null,followers=[],hubFriends=[];
 let catYaw=0,runPhase=0,squashT=0,dustT=0;
 R.skin={color:'ginger',hat:'none',tail:'normal'};
 R.setSkin=function(skin){R.skin={...skin};if(cat){scene.remove(cat)}cat=buildCat(R.skin);scene.add(cat);
@@ -493,6 +512,7 @@ R.buildLevel=function(G,opts={}){
     o.position.set(wx(g.x+6),wy(g.y+64),0);LG.add(o);return {o,col,core,gl}});
   ents.traps=[];
   ents.chaser=G.chase?buildChaser(G.chase.look):null;if(ents.chaser)LG.add(ents.chaser);
+  ents.kennel=G.chase?buildKennel(G.chase):null;
   if(G.boss){ents.boss=buildBoss(G.boss.king);LG.add(ents.boss)}
   // кот
   if(!cat)R.setSkin(R.skin);
@@ -503,7 +523,8 @@ R.buildLevel=function(G,opts={}){
   if(ghostCat){scene.remove(ghostCat);ghostCat=null}
   R.ghost=opts.ghost||null;
   if(R.ghost){ghostCat=buildCat({},true);scene.add(ghostCat)}
-  if(follower){scene.remove(follower);follower=null}
+  followers.forEach(f=>scene.remove(f));followers=[];
+  (opts.followers||[]).slice(-5).forEach(id=>addFollower(id,null));
   hubFriends.forEach(f=>scene.remove(f));hubFriends=[];
   R.hub=!!L.hub;CAM_DIST=L.hub?11:L.arena?30:18;
   R._snap=true;
@@ -548,7 +569,9 @@ R.applyLight=function(G){
 };
 R.breakTile=function(tx,ty){const k=tx+','+ty,m=ents.cracks&&ents.cracks.get(k);if(m){LG.remove(m);ents.cracks.delete(k)}
   for(let i=0;i<14;i++)part(tx+.5+(Math.random()-.5)*.8,ROWS-ty-.5+(Math.random()-.5)*.8,{vx:(Math.random()-.5)*.12,vy:Math.random()*.12,vz:(Math.random()-.2)*.1,life:40,max:40,col:0xc8a088,grav:-.008,big:true})};
-R.showFollower=function(id){if(follower)scene.remove(follower);follower=buildFriend(id);follower.position.copy(ents.cage?ents.cage.g.position:cat.position);scene.add(follower)};
+const FLY={crow:1,owl:1,firefly:1};
+function addFollower(id,from){if(followers.some(f=>f.userData.kind===id))return;const f=buildFriend(id);f.userData.fly=!!FLY[id];f.position.copy(from||cat.position);if(!from)f.position.x-=1+followers.length;scene.add(f);followers.push(f)}
+R.showFollower=function(id){addFollower(id,ents.cage?ents.cage.g.position.clone().add(new THREE.Vector3(0,.6,0)):null)};
 
 /* Дом на крыше: друзья гуляют вокруг */
 R.buildHub=function(G,friends){
@@ -606,10 +629,12 @@ R.frame=function(dt,now){
   // призрак
   if(ghostCat&&R.ghost){const i=Math.min(R.ghost.length/2-1,Math.floor(G.time/2))*2;if(i>=0){const gx=R.ghost[i],gyR=R.ghost[i+1],face=gyR<0?-1:1,gy=gyR<0?-gyR-1:gyR;
     ghostCat.position.set(wx(gx+6),ROWS-(gy+14)/T,-.3);ghostCat.rotation.y=face>0?0:-Math.PI;ghostCat.visible=true}}
-  // друг, который летит следом
-  if(follower&&G.friendFollow){const tx=cx-P.face*.9,ty=cy+(follower.userData.kind==='crow'||follower.userData.kind==='firefly'||follower.userData.kind==='owl'?1.1:0);
-    follower.position.x+=(tx-follower.position.x)*Math.min(1,dt*4);follower.position.y+=(ty-follower.position.y)*Math.min(1,dt*(ty>cy?4:8));follower.position.z=.5;
-    follower.rotation.y=tx>follower.position.x-.05?0:Math.PI;animFriend(follower,t,true)}
+  // друзья бегут и летят следом за котом
+  {let gi=0,fi=0;followers.forEach(f=>{const fly=f.userData.fly;const k=fly?fi++:gi++;
+    const tx=cx-P.face*(fly?(.6+k*.9):(1+k*.85)),ty=fly?cy+1.3+Math.sin(t*3+k)*.15+k*.25:cy;
+    f.position.x+=(tx-f.position.x)*Math.min(1,dt*(5-k*.5));f.position.y+=(ty-f.position.y)*Math.min(1,dt*(fly?4:9));f.position.z=fly?.2:.7;
+    if(!fly&&!P.onGround)f.position.y=Math.max(f.position.y,ty);
+    f.rotation.y=P.face>0?0:Math.PI;animFriend(f,t+k,Math.abs(P.vx)>.3||fly)});}
   // хаб: друзья гуляют
   hubFriends.forEach((f,i)=>{const h=f.userData.home;f.position.x=h+Math.sin(t*.4+i*1.7)*.4;f.rotation.y=Math.cos(t*.4+i*1.7)>0?0:Math.PI;animFriend(f,t+i,Math.abs(Math.cos(t*.4+i*1.7))>.3)});
 
@@ -668,7 +693,7 @@ R.frame=function(dt,now){
   ents.updrafts.forEach(s=>{s.material.opacity=.1+Math.sin(t*3)*.04});
   // клетка
   if(ents.cage){const c=ents.cage;animFriend(c.fm,t,false);
-    if(G.cage&&G.cage.open){c.open=Math.min(1,c.open+dt*2);c.bars.scale.set(1+c.open,1-c.open,1+c.open);c.bars.visible=c.open<1;c.fm.visible=!follower}}
+    if(G.cage&&G.cage.open){c.open=Math.min(1,c.open+dt*2);c.bars.scale.set(1+c.open,1-c.open,1+c.open);c.bars.visible=c.open<1;c.fm.visible=!followers.some(f=>f.userData.kind===c.fm.userData.kind)}}
   // дверь
   if(G.goal){if(!ents.goal)ents.goal=buildGoal(G.goal);const gp=ents.goal;gp.appear=Math.min(1,gp.appear+dt*1.5);gp.g.scale.setScalar(G.boss?gp.appear:1);
     gp.star.rotation.y=t*1.5;const f=.85+Math.sin(t*3)*.15;gp.light.intensity=2.2*f;gp.glow.material.opacity=.4+.15*f;
@@ -688,6 +713,13 @@ R.frame=function(dt,now){
   // ловушки
   if(G.traps)G.traps.forEach((tr,i)=>{let o=ents.traps[i];if(!o){o=ents.traps[i]=buildTrap(tr.tier);o.position.set(wx(tr.x+8),wy(tr.y+8),.3);LG.add(o)}
     o.userData.armed.visible=tr.armed;o.userData.sprung.visible=!tr.armed;if(tr.armed)o.userData.armed.rotation.y=Math.sin(t*2)*.2});
+  // будка
+  if(ents.kennel&&G.chase){const k=ents.kennel,C=G.chase;
+    const sleeping=!C.wake,waking=C.wake&&!C.on;
+    k.zs.forEach((z,i)=>{z.visible=sleeping;const ph=(t*.7+i/3)%1;z.position.set(.3+ph*.5,1.3+ph*1.1,.3);z.material.opacity=1-ph;z.scale.setScalar(.25+ph*.25)});
+    k.eyes.forEach(e=>{e.scale.y=sleeping?.03:waking?.03+Math.min(1,(G.frame-48)/40)*.07:.0001;e.visible=!C.on||G.frame<160});
+    if(waking){const a=Math.min(1,(G.frame-48)/90);k.house.rotation.z=Math.sin(t*(30+a*30))*.05*(.4+a);k.house.position.y=Math.abs(Math.sin(t*25))*.05*a;if(Math.random()<.3*a)dust(k.g.position.x+(Math.random()-.5)*1.2,k.g.position.y,1)}
+    else{k.house.rotation.z*=.8;k.house.position.y=0}}
   // пёс
   if(ents.chaser&&G.chase){const C=G.chase,o=ents.chaser,U=o.userData;o.visible=C.on;
     if(C.on){const x=wx(C.x+6),y=ROWS-(C.y+14)/T;const lx=o.position.x;o.position.set(x,y,-.15);
@@ -751,6 +783,8 @@ R.onEvent=function(e){
     case 'armorBreak':burst(x,y,0xc8d0ff,30,.22,{big:true});shake=10;break;
     case 'goalAppear':burst(x,y+1,0xffe9a8,40,.2,{big:true});break;
     case 'summon':burst(x,y,0x8a2cff,16,.12);break;
+    case 'chaserStart':dust(x,y+.2,18);burst(x,y+.6,K.CHASERS[K.G.chase?K.G.chase.look:0].glow,24,.16,{big:true});shake=Math.max(shake,8);break;
+    case 'chaserWake':shake=Math.max(shake,2);break;
   }
 };
 R.lowPower=()=>lowPower;

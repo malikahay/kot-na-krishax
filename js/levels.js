@@ -137,7 +137,7 @@ const CH={
   },
   /* требуют умений */
   dblWall(b){
-    b.roof(b.ri(5,7));const t=b.top,nt=Math.max(3,t-b.ri(4,5));
+    b.roof(b.ri(5,7));const t=b.top,nt=Math.max(3,t-3);
     for(let r=t-1;r>nt;r-=2)b.star(b.x-1,r);b.roof(b.ri(6,9),nt);b.foeAuto(b.x-3,nt);
   },
   dblGap(b){
@@ -251,7 +251,10 @@ K.LEVEL=Object.fromEntries(K.LEVELS.map((l,i)=>[l.id,Object.assign(l,{index:i})]
 
 function descend(b){if(b.top<6){b.gap(2);b.roof(b.ri(3,5),Math.min(11,b.top+b.ri(3,4)))}}
 function lowerStars(L){
-  for(const s of L.stars){const c=Math.floor(s.x/T),r=Math.floor(s.y/T);const sb=surfaceBelow(L,c,r);
+  const surf=new Map();
+  for(const f of L.falls)surf.set(f.col,Math.min(surf.get(f.col)??99,f.top));
+  for(const m of L.movers){if(m.axis!=='x')continue;const c0=Math.floor((m.cx-(m.amp+m.w*T/2))/T),c1=Math.ceil((m.cx+m.amp+m.w*T/2)/T);for(let c=c0;c<=c1;c++)surf.set(c,Math.min(surf.get(c)??99,Math.round(m.y/T)))}
+  for(const s of L.stars){const c=Math.floor(s.x/T),r=Math.floor(s.y/T);let sb=surfaceBelow(L,c,r);const fs=surf.get(c);if(fs!==undefined&&fs>r&&fs<sb)sb=fs;
     if(sb<ROWS&&sb-r>=2&&sb-r<=3){const nr=sb-1;if(!L.g[nr][c])s.y=nr*T+8}}
 }
 function finalize(b,parPerTile){

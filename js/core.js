@@ -47,7 +47,8 @@ K.startLevel=function(L,opts){
   G.trapTier=tier;G.trapsLeft=G.trapDef?G.trapDef.charges:0;G.traps=[];G.trapCd=0;
   // преследователь
   G.chase=opts.chase?{tier:opts.chase.tier,look:opts.chase.look,speed:opts.chase.speed,lunge:opts.chase.lunge,trail:[],idx:0,on:false,stun:0,boost:0,lungeT:opts.chase.lunge||0,warn:0,x:G.P.x-40,y:G.P.y,face:1,gap:999,bites:0,trapped:0}:null;
-  if(G.chase)G.chase.trail.push([G.P.x,G.P.y]);
+  if(G.chase){const C=G.chase;C.kennel={x:G.P.x-30,y:G.P.y};C.x=C.kennel.x;C.y=C.kennel.y;C.trail.push([C.kennel.x,C.kennel.y]);C.wake=false}
+  G.hinted={};G.wallPush=0;
   // берлога
   G.drips=(L.drips||[]).map(d=>({x:d.col*T+4,y:d.row*T,y0:d.row*T,w:8,h:14,st:'hang',t:0,vy:0}));
   G.geysers=(L.geysers||[]).map(g=>({x:g.col*T+2,y:g.top*T-64,w:12,h:64,phase:g.phase,on:false,warn:false}));
@@ -255,6 +256,10 @@ K.step=function(){
     if(!P.wasGround){emit('land',{x:P.x+6,y:P.y+P.h,v:fallV});if(G.combo>=2)emit('comboEnd',{n:G.combo});G.combo=0}
   }
   if(P.inv>0)P.inv--;
+  // подсказки к умениям: показываются один раз, когда упираешься в препятствие
+  if(P.onGround&&dir){const ft=Math.floor((dir>0?P.x+P.w+2:P.x-2)/T),r0=Math.floor((P.y+P.h-1)/T);let h=0;while(h<7&&solidWall(ft,r0-h))h++;
+    if(h>=3){G.wallPush++;if(G.wallPush>12){const k=A.has('wall')&&h>=6?'wall':A.has('double')&&h>=3?'double':null;if(k&&!G.hinted[k]){G.hinted[k]=1;emit('hint',{k})}}}else G.wallPush=0}
+  if(!P.onGround&&P.vy>2&&A.has('glide')&&!G.hinted.glide&&!standable(Math.floor(cx/T),Math.floor((P.y+P.h+40)/T))&&P.y>4*T){let pit=true;for(let r=Math.floor((P.y+P.h)/T);r<ROWS;r++)if(standable(Math.floor(cx/T),r))pit=false;if(pit){G.hinted.glide=1;emit('hint',{k:'glide'})}}
   if(P.onGround&&!P.ride&&P.inv===0&&G.frame%15===0&&!nearHazard())P.safe={x:P.x,y:P.y};
   if(G.mode==='endless')G.distance=Math.max(G.distance,Math.floor(P.x/T));
 
@@ -413,13 +418,17 @@ K.cageReady=function(){return Object.keys(K.cageMissing()).length===0};
 function updateChaser(C,P){
   const tr=C.trail,last=tr[tr.length-1];
   if(Math.abs(P.x-last[0])+Math.abs(P.y-last[1])>.8)tr.push([P.x,P.y]);
-  if(!C.on){if(G.frame>150){C.on=true;C.idx=0;emit('chaserStart',{name:K.CHASERS[C.look].name})}else return}
+  if(!C.on){
+    if(!C.wake&&G.frame>=48){C.wake=true;emit('chaserWake',{x:C.kennel.x+6,y:C.kennel.y})}
+    if(G.frame>=138){C.on=true;C.idx=0;C.stun=30;emit('chaserStart',{name:K.CHASERS[C.look].name,x:C.kennel.x+6,y:C.kennel.y})}else return}
   if(C.stun>0){C.stun--;if(C.stun===0)emit('chaserFree',{x:C.x,y:C.y})}
   else{
     let sp=C.speed;
     if(C.lunge){if(--C.lungeT<=0){if(C.warn===0){C.warn=45;emit('chaserHowl',{x:C.x,y:C.y})}}
       if(C.warn>0&&--C.warn===0){C.boost=34;C.lungeT=C.lunge}}
     if(C.boost>0){C.boost--;sp*=2.3}
+    // пёс не отстаёт: если след слишком длинный, он мчится вдогонку и держится рядом
+    const gap=tr.length-1-C.idx;if(gap>75)sp=Math.max(sp,1.25+Math.min(1.4,(gap-75)/60));
     C.idx=Math.min(tr.length-1,C.idx+sp);
   }
   const i=Math.floor(C.idx),p=tr[i],q=tr[Math.min(tr.length-1,i+1)],f=C.idx-i;
@@ -438,7 +447,7 @@ function updateChaser(C,P){
   // укус
   if(C.stun===0&&C.on&&Math.abs(C.x-P.x)<12&&Math.abs(C.y-P.y)<14){
     if(P.dash>0){C.stun=60;C.idx=Math.max(0,C.idx-60);emit('chaserBonk',{x:C.x+6,y:C.y})}
-    else if(P.inv===0&&!(G.state!=='play')){C.bites++;emit('chaserBite',{x:P.x+6,y:P.y+7});hurt('chaser');C.idx=Math.max(0,C.idx-170);C.stun=40}
+    else if(P.inv===0&&!(G.state!=='play')){C.bites++;emit('chaserBite',{x:P.x+6,y:P.y+7});hurt('chaser');C.idx=Math.max(0,C.idx-90);C.stun=45}
   }
 }
 

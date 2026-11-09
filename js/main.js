@@ -27,7 +27,7 @@ function abilities(){return S.friends.map(id=>K.FRIEND[id].abil)}
 function bestTrap(){const story=K.LEVELS.filter(l=>!l.boss);let t=0;story.forEach((l,i)=>{if(S.levels[l.id])t=i});return t}
 function enterLevel(L,theme,music,opts){
   K.startLevel(L,opts);
-  R.setTheme(theme);R.clearHub();R.buildLevel(G,{ghost:opts.ghost});
+  R.setTheme(theme);R.clearHub();R.buildLevel(G,{ghost:opts.ghost,followers:S.friends});
   A.play(music);A.setIntensity(0);
   UI.hide();UI.hudShow(true);UI.bossBar(null);
   K.input.left=K.input.right=K.input.jump=false;

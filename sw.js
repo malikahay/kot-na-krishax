@@ -1,5 +1,5 @@
 /* Офлайн-кэш: игра целиком работает без интернета после первого запуска. */
-const V='kot-v3';
+const V='kot-v5';
 const CORE=['./','index.html','manifest.webmanifest','vendor/three.min.js','js/data.js','js/levels.js','js/core.js','js/audio.js','js/render.js','js/ui.js','js/main.js','icons/icon-192.png','icons/icon-512.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(V).then(c=>c.addAll(CORE)).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==V).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
