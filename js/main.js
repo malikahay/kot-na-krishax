@@ -27,7 +27,7 @@ function abilities(){return S.friends.map(id=>K.FRIEND[id].abil)}
 function bestTrap(){const story=K.LEVELS.filter(l=>!l.boss);let t=0;story.forEach((l,i)=>{if(S.levels[l.id])t=i});return t}
 function enterLevel(L,theme,music,opts){
   K.startLevel(L,opts);
-  R.setTheme(theme);R.clearHub();R.buildLevel(G,{ghost:opts.ghost,followers:S.friends});
+  R.setTheme(theme);R.clearHub();R.buildLevel(G,{ghost:opts.ghost,followers:L.arena?[]:S.friends.slice(-3)});
   A.play(music);A.setIntensity(0);
   UI.hide();UI.hudShow(true);UI.bossBar(null);
   K.input.left=K.input.right=K.input.jump=false;
@@ -59,7 +59,7 @@ app.toHub=function(t){
   cur=null;app.platformGameplay(false);UI.hudShow(false);
   const L=K.buildHub();K.startLevel(L,{mode:'hub',abil:[]});G.state='idle';
   R.setTheme(K.HUB_THEME);R.setSkin(S.skin);R.buildHub(G,S.friends);
-  A.play('hub');UI.hub(t);
+  A.play('hub');UI.hub(t||'map');
 };
 function withStory(id,go){const key={'1-1':'intro','2-1':'world2','3-1':'world3'}[id];S.seen=S.seen||{};if(key&&!S.seen[key]){S.seen[key]=true;persist();UI.story(key,0,go)}else go()}
 function restart(){if(!cur)return;if(cur.mode==='daily')app.playDaily();else if(cur.mode==='endless')app.playEndless();else app.play(cur.id,cur.mode)}
@@ -128,17 +128,17 @@ function drain(){
 /* ---------- действия интерфейса ---------- */
 app.act=function(a,d){
   switch(a){
-    case 'enter':if(!S.seenIntro){S.seenIntro=true;persist();app.toHub('map');UI.toast('Начните с уровня 1-1 на карте')}else app.toHub();break;
+    case 'enter':S.seenIntro=true;persist();UI.fadeTo(()=>app.toHub('map'));break;
     case 'title':UI.title();break;
     case 'tab':R.setSkin(S.skin);UI.setTab(d.tab);break;
-    case 'level':UI.levelIntro(d.id);break;
-    case 'play':withStory(d.id,()=>app.play(d.id,'story'));break;
+    case 'level':UI.zoomNode(d.id,()=>UI.levelIntro(d.id));break;
+    case 'play':withStory(d.id,()=>UI.fadeTo(()=>app.play(d.id,'story')));break;
     case 'storyNext':UI.storyNext(false);break;
     case 'storySkip':UI.storyNext(true);break;
-    case 'time':app.play(d.id,'time');break;
-    case 'hub':if(pendingEnding){pendingEnding=false;app.toHub();UI.ending();break}app.toHub();break;
+    case 'time':UI.fadeTo(()=>app.play(d.id,'time'));break;
+    case 'hub':if(pendingEnding){pendingEnding=false;UI.fadeTo(()=>{app.toHub();UI.ending()});break}UI.fadeTo(()=>app.toHub());break;
     case 'resume':resume();break;
-    case 'restart':restart();break;
+    case 'restart':UI.fadeTo(restart);break;
     case 'cont':K.continueRun();UI.hide();break;
     case 'shopcat':UI.setShop(d.cat,null);break;
     case 'shopsel':{const c=UI.shopState().cat;R.setSkin({...S.skin,[c]:d.id});UI.setShop(c,d.id);break}
@@ -148,8 +148,8 @@ app.act=function(a,d){
       else A.sfxPlay('deny');break}
     case 'music':A.toggleMusic();if(G.state==='pause')UI.pause();else UI.hub();break;
     case 'sfx':A.toggleSfx();if(G.state==='pause')UI.pause();else UI.hub();break;
-    case 'daily':app.playDaily();break;
-    case 'endless':app.playEndless();break;
+    case 'daily':UI.fadeTo(()=>app.playDaily());break;
+    case 'endless':UI.fadeTo(()=>app.playEndless());break;
     case 'share':share(d.what);break;
     case 'install':install();break;
     case 'reset':UI.confirm('Весь прогресс, звёзды и скины будут удалены.','doReset');break;

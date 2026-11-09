@@ -259,6 +259,7 @@ K.step=function(){
   // подсказки к умениям: показываются один раз, когда упираешься в препятствие
   if(P.onGround&&dir){const ft=Math.floor((dir>0?P.x+P.w+2:P.x-2)/T),r0=Math.floor((P.y+P.h-1)/T);let h=0;while(h<7&&solidWall(ft,r0-h))h++;
     if(h>=3){G.wallPush++;if(G.wallPush>12){const k=A.has('wall')&&h>=6?'wall':A.has('double')&&h>=3?'double':null;if(k&&!G.hinted[k]){G.hinted[k]=1;emit('hint',{k})}}}else G.wallPush=0}
+  if(P.onGround&&A.has('double')&&!G.hinted.double&&dir>0){const c0=Math.floor((P.x+P.w+4)/T),r0=Math.floor((P.y+P.h+2)/T);let pit=0;for(let k=0;k<5;k++){let any=false;for(let r=r0-2;r<ROWS;r++)if(standable(c0+k,r)){any=true;break}if(!any)pit++;else break}if(pit>=4){G.hinted.double=1;emit('hint',{k:'double'})}}
   if(!P.onGround&&P.vy>2&&A.has('glide')&&!G.hinted.glide&&!standable(Math.floor(cx/T),Math.floor((P.y+P.h+40)/T))&&P.y>4*T){let pit=true;for(let r=Math.floor((P.y+P.h)/T);r<ROWS;r++)if(standable(Math.floor(cx/T),r))pit=false;if(pit){G.hinted.glide=1;emit('hint',{k:'glide'})}}
   if(P.onGround&&!P.ride&&P.inv===0&&G.frame%15===0&&!nearHazard())P.safe={x:P.x,y:P.y};
   if(G.mode==='endless')G.distance=Math.max(G.distance,Math.floor(P.x/T));
@@ -371,6 +372,7 @@ K.step=function(){
   for(const f of G.fish){
     if(f.got)continue;
     const dx=cx-f.x,dy=cy-f.y;
+    if(!f.told&&f.gate&&!A.has(f.gate)&&Math.abs(dx)<6*T){f.told=true;emit('fishLocked',{gate:f.gate})}
     if(mag&&dx*dx+dy*dy<52*52){f.x+=dx*.12;f.y+=dy*.12}
     if(Math.abs(dx)<11&&Math.abs(dy)<12){f.got=true;addScore(500,f.x,f.y-8,'#ffe58a');emit('fish',{x:f.x,y:f.y})}
   }

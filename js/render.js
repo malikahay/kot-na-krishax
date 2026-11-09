@@ -393,8 +393,10 @@ function buildChaser(look){
 /* Будка, где спит пёс */
 const zTex=()=>canvasTex(32,32,(c)=>{c.fillStyle='#cfc8ff';c.font='bold 26px system-ui,sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText('Z',16,17)});
 let ZT=null;
-function buildKennel(C){
-  const L=K.CHASERS[C.look],g=new THREE.Group(),house=new THREE.Group();g.add(house);
+function buildKennelModel(look){const k=buildKennelParts(look);return k.g}
+function buildKennel(C){const k=buildKennelParts(C.look,C);k.g.position.set(wx(C.kennel.x+6),ROWS-(C.kennel.y+14)/T,-.35);LG.add(k.g);return k}
+function buildKennelParts(look,Cc){
+  const C={look},L=K.CHASERS[look],g=new THREE.Group(),house=new THREE.Group();g.add(house);
   const wood=cmat(C.look===1?0x4a4a5a:C.look===2?0x2a1838:0x7a4a2a),roofM=cmat(C.look===1?0x8a2a2a:C.look===2?0x5a1a7a:0xa03a2a);
   box(1.3,.95,1.1,wood,0,.475,0,house);
   const roof=new THREE.Mesh(new THREE.ConeGeometry(1.05,.6,4),roofM);roof.rotation.y=Math.PI/4;roof.position.y=1.25;roof.scale.set(1,1,.85);roof.castShadow=true;roof.userData.ownGeo=true;house.add(roof);
@@ -405,7 +407,6 @@ function buildKennel(C){
   const bowl=cyl(.16,.08,cmat(0xc83a5a),.85,.04,.35,g);
   if(!ZT)ZT=zTex();
   const zs=[0,1,2].map(i=>{const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:ZT,transparent:true,depthWrite:false}));sp.scale.setScalar(.35);g.add(sp);return sp});
-  g.position.set(wx(C.kennel.x+6),ROWS-(C.kennel.y+14)/T,-.35);LG.add(g);
   return {g,house,eyes,zs};
 }
 
@@ -775,7 +776,7 @@ R.onEvent=function(e){
     case 'parry':case 'poof':burst(x,y,0xff9ae0,8,.08);break;
     case 'checkpoint':burst(x,y,0xffe08a,20,.12,{big:true});break;
     case 'shieldBreak':burst(x,y,0x8affc8,24,.18);shake=6;break;
-    case 'rescue':burst(x,y,0xffd85a,40,.2,{big:true});R.showFollower(e.friend);break;
+    case 'rescue':burst(x,y,0xffd85a,40,.2,{big:true});if(!K.G.L.arena)R.showFollower(e.friend);break;
     case 'bossHit':burst(x,y,0xffffff,30,.25,{big:true});shake=14;break;
     case 'bossBoom':burst(x,y,0xff5d8f,10,.2,{big:true});shake=Math.max(shake,6);break;
     case 'bossDown':burst(x,y,0xffd85a,60,.3,{big:true});shake=20;break;
@@ -786,6 +787,70 @@ R.onEvent=function(e){
     case 'chaserStart':dust(x,y+.2,18);burst(x,y+.6,K.CHASERS[K.G.chase?K.G.chase.look:0].glow,24,.16,{big:true});shake=Math.max(shake,8);break;
     case 'chaserWake':shake=Math.max(shake,2);break;
   }
+};
+/* ---------- портреты и иллюстрации: рисуем героев теми же 3D-моделями ---------- */
+let PR=null;const picCache={};
+function prInit(){
+  if(PR)return PR;
+  const c=document.createElement('canvas');c.width=c.height=256;
+  const r=new THREE.WebGLRenderer({canvas:c,alpha:true,antialias:true,preserveDrawingBuffer:true});r.setPixelRatio(1);
+  const sc=new THREE.Scene();sc.add(new THREE.HemisphereLight(0xcfc8ff,0x2a1a4a,.95));const dl=new THREE.DirectionalLight(0xffffff,1.1);dl.position.set(3,5,6);sc.add(dl);
+  const rim=new THREE.DirectionalLight(0x8a7aff,.7);rim.position.set(-4,2,-3);sc.add(rim);
+  PR={r,c,sc,cam:new THREE.PerspectiveCamera(28,1,.1,200)};return PR;
+}
+function modelFor(kind,id){
+  switch(kind){
+    case 'cat':{const m=buildCat(typeof id==='object'?id:R.skin);m.rotation.y=-.55;return m}
+    case 'friend':{const m=buildFriend(id);m.rotation.y=-.55;animFriend(m,.3,false);return m}
+    case 'dog':{const m=buildChaser(id|0);m.rotation.y=-.6;return m}
+    case 'king':{const m=buildBoss(true);m.userData.armor.visible=false;m.userData.dizzy.visible=false;m.rotation.y=-.3;return m}
+    case 'general':{const m=buildBoss(false);m.userData.armor.visible=false;m.userData.dizzy.visible=false;m.rotation.y=-.3;return m}
+    case 'enemy':return buildEnemy(id);
+    case 'item':{const m=buildItem(id);m.children.forEach(c=>{if(c.isSprite)c.visible=false});m.userData.m.rotation.y=.5;return m}
+    case 'trap':{const m=buildTrap(id|0);m.userData.sprung.visible=false;m.rotation.x=.5;return m}
+    case 'fish':{const g=new THREE.Group(),m=new THREE.Mesh(Geo.fish,M.fish);m.rotation.y=.4;g.add(m);return g}
+    case 'cage':{const g=new THREE.Group();const fm=buildFriend(id);g.add(fm);for(let i=0;i<5;i++)for(const z of [-.4,.4])box(.05,1.5,.05,M.bar,-.6+i*.3,.75,z,g);box(1.4,.08,.9,M.bar,0,1.5,0,g);box(1.4,.08,.9,M.bar,0,.02,0,g);box(.18,.16,.08,M.gold,0,.7,.5,g);g.rotation.y=-.4;return g}
+    case 'kennel':{const k=buildKennelModel(id|0);return k}
+  }
+  return new THREE.Group();
+}
+function fit(obj,cam,pad){
+  const b=new THREE.Box3();obj.updateMatrixWorld(true);obj.traverseVisible(o=>{if(o.isMesh&&!o.isSprite){if(!o.geometry.boundingBox)o.geometry.computeBoundingBox();b.union(o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld))}});if(b.isEmpty())b.setFromObject(obj);const sz=b.getSize(new THREE.Vector3()),c=b.getCenter(new THREE.Vector3());
+  const r=Math.max(sz.x/cam.aspect,sz.y,.2)*.5*pad;const d=r/Math.tan(cam.fov*Math.PI/360);
+  cam.position.set(c.x+d*.12,c.y+d*.12,c.z+d);cam.lookAt(c);
+}
+R.pic=function(kind,id,size=128){
+  const key=kind+':'+JSON.stringify(id)+':'+size;if(picCache[key])return picCache[key];
+  try{
+    const P=prInit();P.r.setSize(size,size,false);P.cam.aspect=1;P.cam.updateProjectionMatrix();
+    const m=modelFor(kind,id);P.sc.add(m);m.updateMatrixWorld(true);fit(m,P.cam,1.18);
+    P.r.setClearColor(0x000000,0);P.r.render(P.sc,P.cam);const url=P.c.toDataURL('image/png');P.sc.remove(m);
+    return picCache[key]=url;
+  }catch(e){return ''}
+};
+R.clearPicCache=function(kind){for(const k in picCache)if(!kind||k.startsWith(kind+':'))delete picCache[k]};
+/* Сюжетная иллюстрация: фон, крыша и герои */
+R.illustrate=function(spec,w=640,h=300){
+  const key='ill:'+JSON.stringify(spec)+w;if(picCache[key])return picCache[key];
+  try{
+    const P=prInit();P.r.setSize(w,h,false);
+    const sc=new THREE.Scene();const bgs={night:['#06041a','#1c1450','#43306e'],storm:['#120020','#3a0a4a','#7a2a6e'],factory:['#03100f','#0d2a2c','#1f4a48'],cave:['#020107','#0e061e','#26103a']};
+    const g=bgs[spec.bg]||bgs.night;const bgt=canvasTex(4,128,(c,ww,hh)=>{const gr=c.createLinearGradient(0,0,0,hh);gr.addColorStop(0,g[0]);gr.addColorStop(.6,g[1]);gr.addColorStop(1,g[2]);c.fillStyle=gr;c.fillRect(0,0,ww,hh)});sc.background=bgt;
+    sc.add(new THREE.HemisphereLight(0xcfc8ff,0x2a1a4a,.9));const dl=new THREE.DirectionalLight(0xffffff,1);dl.position.set(3,6,8);sc.add(dl);
+    const rr=rng(spec.bg.length*31+(spec.actors||[]).length);
+    // звёзды, луна, силуэты
+    if(spec.bg!=='cave'){const n=160,pos=new Float32Array(n*3);for(let i=0;i<n;i++){pos[i*3]=(rr()-.5)*40;pos[i*3+1]=1+rr()*12;pos[i*3+2]=-12}const gg=new THREE.BufferGeometry();gg.setAttribute('position',new THREE.BufferAttribute(pos,3));sc.add(new THREE.Points(gg,new THREE.PointsMaterial({color:0xffffff,size:.09})));
+      if(spec.bg!=='storm'){const mm=new THREE.Mesh(new THREE.SphereGeometry(1.3,24,16),basic({color:0xfff3c4}));mm.position.set(5.5,6,-11);sc.add(mm);const bt=new THREE.Mesh(new THREE.SphereGeometry(1.2,24,16),basic({color:new THREE.Color(g[0])}));bt.position.set(6.1,6.4,-10.5);sc.add(bt)}}
+    for(let x=-14;x<14;){const bw=1+rr()*2.2,bh=1.5+rr()*5;const m=new THREE.Mesh(new THREE.BoxGeometry(bw,bh,1),spec.bg==='cave'?std({color:0x1e1430,roughness:1}):std({color:spec.bg==='factory'?0x163838:0x231b55,emissive:0xffffff,emissiveMap:winTexes&&winTexes[0],emissiveIntensity:.5}));m.position.set(x+bw/2,bh/2-1,-6-rr()*2);sc.add(m);x+=bw+.2}
+    if(spec.bg==='cave')for(let i=0;i<14;i++){const c=new THREE.Mesh(new THREE.ConeGeometry(.3+rr()*.4,1+rr()*2,6),std({color:0x241c34}));c.rotation.x=Math.PI;c.position.set(-9+i*1.4,6-rr(),-3);sc.add(c);if(i%3===0){const cr=new THREE.Mesh(new THREE.OctahedronGeometry(.3),i%2?M.crystal:M.crystal2);cr.position.set(-8+i*1.3,.2,-1.5);cr.scale.y=1.8;sc.add(cr)}}
+    // крыша
+    const roof=new THREE.Mesh(new THREE.BoxGeometry(30,2,3),std({map:spec.bg==='cave'?stoneTex:brickTex,color:spec.bg==='cave'?0x4a4058:0x6a58c0}));roof.position.set(0,-1,0);sc.add(roof);
+    const top=new THREE.Mesh(new THREE.BoxGeometry(30,.2,3.2),std({color:spec.bg==='cave'?0x2f8a74:spec.bg==='factory'?0x6fd6c0:0x8f80e0}));top.position.set(0,.02,0);sc.add(top);
+    for(const a of spec.actors||[]){const m=modelFor(a.k,a.id);m.position.set(a.x||0,(a.y||0)+(a.k==='king'||a.k==='general'?1.2:0),a.z||0);if(a.s)m.scale.multiplyScalar(a.s);if(a.ry!==undefined)m.rotation.y=a.ry;if(a.glow){const sp=new THREE.Sprite(glowMat(a.glow,.6));sp.scale.set(2.4,2.4,1);sp.position.copy(m.position).add(new THREE.Vector3(0,.6,.2));sc.add(sp)}sc.add(m)}
+    const cam=new THREE.PerspectiveCamera(32,w/h,.1,200);cam.position.set(0,2.2,9.5);cam.lookAt(0,1.1,0);
+    P.r.setClearColor(0x000000,1);P.r.render(sc,cam);const url=P.c.toDataURL('image/jpeg',.88);
+    return picCache[key]=url;
+  }catch(e){console.warn(e);return ''}
 };
 R.lowPower=()=>lowPower;
 R.info=()=>({calls:renderer.info.render.calls,tris:renderer.info.render.triangles,geo:renderer.info.memory.geometries,tex:renderer.info.memory.textures});

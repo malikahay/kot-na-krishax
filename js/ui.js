@@ -8,10 +8,16 @@ const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',
 const fmtT=s=>{s=Math.max(0,s);const m=Math.floor(s/60),r=Math.floor(s%60),d=Math.floor(s*10%10);return `${m}:${String(r).padStart(2,'0')}.${d}`};
 U.fmtT=fmtT;
 const click=()=>K.audio.sfxPlay('click');
+const pic=(k,id,sz=28,cls='')=>{const u=K.render.pic(k,id,Math.min(256,Math.round(sz*2)));return u?`<img class="pic ${cls}" src="${u}" width="${sz}" height="${sz}" alt="">`:''};
+U.pic=pic;
+const LOCK='<svg class="lock" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2.5" fill="#c8bfff"/><path d="M8 10V7a4 4 0 0 1 8 0v3" fill="none" stroke="#c8bfff" stroke-width="2.4"/><circle cx="12" cy="15.5" r="1.8" fill="#3a2f78"/></svg>';
+const itemPic=(k,sz=20)=>pic('item',k,sz);
 function show(html,cls='dim'){const s=scr();s.className='screen '+cls;s.innerHTML=html;s.hidden=false;s._t=performance.now();
   s.querySelectorAll('[data-act]').forEach(b=>b.addEventListener('click',e=>{if(performance.now()-s._t<250&&!/^(tab|shop|equip|music|sfx)/.test(b.dataset.act))return;click();const a=b.dataset.act;K.app.act(a,b.dataset,e)}));
   const f=s.querySelector('[autofocus]')||s.querySelector('.btn');if(f)try{f.focus({preventScroll:true})}catch(e){}}
 U.hide=function(){scr().hidden=true;scr().innerHTML=''};
+U.fadeTo=function(fn){const f=$('fade');f.classList.add('on');setTimeout(()=>{try{fn()}finally{requestAnimationFrame(()=>setTimeout(()=>f.classList.remove('on'),60))}},300)};
+U.zoomNode=function(id,fn){const i=K.LEVEL[id].index,c=document.querySelector('.mapc');if(!c){fn();return}const [x,y]=NODES[i];c.style.transformOrigin=`${x/MAPW*100}% ${y/MAPH*100}%`;c.style.transform='scale(1.35)';c.classList.add('zoom');setTimeout(fn,380)};
 U.visible=()=>!scr().hidden;
 
 /* ---------- титульный экран ---------- */
@@ -34,10 +40,10 @@ U.hub=function(t){
   if(tab==='map'){U.worldMap();return}
   const S=K.app.save;
   const fishGot=Object.values(S.levels).reduce((a,l)=>a+(l.fish?1:0),0),fishAll=K.LEVELS.filter(l=>!l.boss).length;
-  const tabs=[['map','🗺 Карта'],['shop','Лавка'],['friends','Друзья'],['ch','Испытания'],['set','Настройки']];
+  const tabs=[['map','Карта'],['shop','Лавка'],['friends','Друзья'],['ch','Испытания'],['set','Настройки']];
   show(`<div class="hubui safe">
     <div class="hubtop"><h1>Кот на <span>крышах</span></h1>
-      <div class="row"><span class="chip"><span class="s">★</span><b>${S.wallet}</b></span><span class="chip" title="Золотые рыбки">🐟 <b>${fishGot}/${fishAll}</b></span></div></div>
+      <div class="row"><span class="chip"><span class="s">★</span><b>${S.wallet}</b></span><span class="chip" title="Золотые рыбки">${pic('fish',0,20)} <b>${fishGot}/${fishAll}</b></span></div></div>
     <div class="sheet" role="dialog" aria-label="Меню">
       <div class="tabs" role="tablist">${tabs.map(([k,n])=>`<button role="tab" class="${k===tab?'on':''}" data-act="tab" data-tab="${k}">${n}</button>`).join('')}</div>
       <div class="pane" id="pane">${pane()}</div>
@@ -62,9 +68,9 @@ function mapPane(){
     lv.forEach(l=>{
       const st=S.levels[l.id],open=K.app.unlocked(l.id),next=open&&!st;
       const cls=['node',l.boss?'boss':'',st?'done':'',next?'next':'',open?'':'lock'].join(' ');
-      const label=l.boss?(l.boss==='king'?'♛':'☠'):l.id;
+      const label=l.boss?(l.boss==='king'?pic('king',0,30):pic('general',0,30)):l.id;
       html+=`<button class="${cls}" ${open?`data-act="level" data-id="${l.id}"`:'disabled'} aria-label="${esc(l.name)}">
-        <span class="o">${open?label:'🔒'}${st&&st.fish?'<span class="fish">🐟</span>':''}</span>
+        <span class="o">${open?label:LOCK}${st&&st.fish?`<span class="fish">${pic('fish',0,16)}</span>`:''}</span>
         <span class="st">${open?stars3(st&&st.stars):''}</span><span class="nm">${esc(l.name)}</span></button>`;
     });
     html+='</div></div>';
@@ -74,16 +80,14 @@ function mapPane(){
   return html;
 }
 function hex(n){return '#'+n.toString(16).padStart(6,'0')}
-const HAT_ICON={none:'—',bandana:'🎀',ushanka:'🧢',flower:'🌸',party:'🎉',tophat:'🎩',headphones:'🎧',halo:'😇',crown:'👑'};
-const TAIL_ICON={normal:'〰',fluffy:'☁',bow:'🎀',double:'⑂',glow:'✦',bolt:'⚡'};
 function shopPane(){
   const S=K.app.save,list=K.SKINS[shopCat];
   const sel=shopSel&&list.find(i=>i.id===shopSel)||list.find(i=>i.id===S.skin[shopCat]);
   let html=`<div class="cats">${[['color','Окрас'],['hat','Шапки'],['tail','Хвосты']].map(([k,n])=>`<button class="${k===shopCat?'on':''}" data-act="shopcat" data-cat="${k}">${n}</button>`).join('')}</div><div class="grid">`;
   list.forEach(it=>{
     const own=S.owned.includes(shopCat+':'+it.id)||(!it.price&&!it.unlock),eq=S.skin[shopCat]===it.id;
-    const sw=shopCat==='color'?`<span class="sw" style="background:linear-gradient(90deg,${hex(it.body)} 60%,${hex(it.dark)} 60%)"></span>`:`<span class="sw" style="background:#2c2366">${shopCat==='hat'?HAT_ICON[it.id]:TAIL_ICON[it.id]}</span>`;
-    const p=eq?'<span class="p own">Надето</span>':own?'<span class="p own">Есть</span>':it.unlock?`<span class="p">🔒 особый</span>`:`<span class="p">★ ${it.price}</span>`;
+    const sk={...S.skin,[shopCat]:it.id};const sw=`<span class="sw pv">${pic('cat',sk,64)}</span>`;
+    const p=eq?'<span class="p own">Надето</span>':own?'<span class="p own">Есть</span>':it.unlock?`<span class="p">${LOCK} особый</span>`:`<span class="p">★ ${it.price}</span>`;
     html+=`<button class="item ${sel&&sel.id===it.id?'sel':''}" data-act="shopsel" data-id="${it.id}">${sw}<span class="n">${esc(it.name)}</span>${p}</button>`;
   });
   html+='</div>';
@@ -103,8 +107,8 @@ function friendsPane(){
   let html='<p class="sub">Спасённые друзья живут у вас на крыше и учат новому.</p>';
   K.FRIENDS.forEach(f=>{
     const has=S.friends.includes(f.id);const lv=K.LEVELS.find(l=>l.friend===f.id);
-    html+=has?`<div class="friend"><span class="av">${f.icon}</span><div><b>${esc(f.name)}</b><span class="s">${esc(f.abilName)}</span><div class="q">${esc(f.how)}</div><div class="q">«${esc(f.home)}»</div></div></div>`
-      :`<div class="friend locked"><span class="av">?</span><div><b>???</b><div class="q">Заперт в клетке на уровне ${lv.id} «${esc(lv.name)}»</div></div></div>`;
+    html+=has?`<div class="friend"><span class="av">${pic('friend',f.id,44)}</span><div><b>${esc(f.name)}</b><span class="s">${esc(f.abilName)}</span><div class="q">${esc(f.how)}</div><div class="q">«${esc(f.home)}»</div></div></div>`
+      :`<div class="friend locked"><span class="av">${pic('friend',f.id,44,'sil')}</span><div><b>???</b><div class="q">Заперт в клетке на уровне ${lv.id} «${esc(lv.name)}»</div></div></div>`;
   });
   return html;
 }
@@ -146,7 +150,15 @@ U.setShop=(c,s)=>{if(c)shopCat=c;shopSel=s;U.hub()};
 U.shopState=()=>({cat:shopCat,sel:shopSel});
 
 /* ---------- карта мира: дорога через город к берлоге ---------- */
-const MAPW=2600,MAPH=640;
+const MAPW=2600,MAPH=640;let mapProgress=0;
+function roadPath(upto){
+  const P=NODES.slice(0,upto+1);if(P.length<2)return `M${P[0][0]} ${P[0][1]}`;
+  let d=`M${P[0][0]} ${P[0][1]}`;
+  for(let i=0;i<P.length-1;i++){const p0=P[Math.max(0,i-1)],p1=P[i],p2=P[i+1],p3=P[Math.min(P.length-1,i+2)];
+    const c1=[p1[0]+(p2[0]-p0[0])/6,p1[1]+(p2[1]-p0[1])/6],c2=[p2[0]-(p3[0]-p1[0])/6,p2[1]-(p3[1]-p1[1])/6];
+    d+=` C${c1[0].toFixed(1)} ${c1[1].toFixed(1)} ${c2[0].toFixed(1)} ${c2[1].toFixed(1)} ${p2[0]} ${p2[1]}`}
+  return d;
+}
 const NODES=[[150,470],[340,330],[560,450],[790,300],[1010,420],[1210,270],[1420,400],[1640,250],[1860,380],[2070,470],[2280,330],[2470,230]];
 function mapArt(){
   let a=`<defs>
@@ -154,6 +166,7 @@ function mapArt(){
     <linearGradient id="z2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#05141a"/><stop offset="1" stop-color="#1f4a48"/></linearGradient>
     <linearGradient id="z3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#030108"/><stop offset="1" stop-color="#1e0c30"/></linearGradient>
     <linearGradient id="fadeA" x1="0" x2="1"><stop offset="0" stop-color="#3b2868" stop-opacity="0"/><stop offset="1" stop-color="#1f4a48"/></linearGradient>
+    <filter id="soft"><feGaussianBlur stdDeviation="6"/></filter>
     <radialGradient id="moon"><stop offset="0" stop-color="#fff3c4"/><stop offset=".6" stop-color="#fff3c4" stop-opacity=".25"/><stop offset="1" stop-color="#fff3c4" stop-opacity="0"/></radialGradient>
   </defs>
   <rect x="0" y="0" width="900" height="${MAPH}" fill="url(#z1)"/><rect x="900" y="0" width="900" height="${MAPH}" fill="url(#z2)"/><rect x="1800" y="0" width="800" height="${MAPH}" fill="url(#z3)"/>
@@ -175,9 +188,15 @@ function mapArt(){
   a+=`<path d="M1800 ${MAPH} L1800 520 Q1900 470 2000 540 Q2150 600 2300 500 Q2450 420 2600 520 L2600 ${MAPH}Z" fill="#14091f"/>`;
   for(let i=0;i<22;i++){const x=1820+R()*760,y=180+R()*400,s=8+R()*20,c=R()<.5?'#9a6aff':'#5affd0';a+=`<path d="M${x|0} ${(y-s*1.8)|0} L${(x+s*.6)|0} ${y|0} L${x|0} ${(y+s*.5)|0} L${(x-s*.6)|0} ${y|0}Z" fill="${c}" opacity=".75"/><circle cx="${x|0}" cy="${y|0}" r="${(s*1.6)|0}" fill="${c}" opacity=".08"/>`}
   a+=`<ellipse cx="2470" cy="270" rx="120" ry="150" fill="#000" opacity=".55"/><text x="2470" y="120" text-anchor="middle" font-size="22" fill="#d88aff" font-family="Rubik Mono One, sans-serif">ЛОГОВО</text>`;
-  // дорога
-  const d=NODES.map((p,i)=>i?`S${(NODES[i-1][0]+p[0])/2} ${p[1]+(i%2?-70:70)} ${p[0]} ${p[1]}`:`M${p[0]} ${p[1]}`).join(' ');
-  a+=`<path d="${d}" fill="none" stroke="#000" stroke-opacity=".35" stroke-width="30" stroke-linecap="round"/><path d="${d}" fill="none" stroke="#e8dcc0" stroke-opacity=".85" stroke-width="16" stroke-linecap="round" stroke-dasharray="2 22"/>`;
+  // дорога: плавная кривая через все уровни
+  const d=roadPath(NODES.length-1),dp=roadPath(Math.max(0,mapProgress));
+  a+=`<path d="${d}" fill="none" stroke="#000" stroke-opacity=".45" stroke-width="44" stroke-linecap="round" transform="translate(0,8)"/>
+    <path d="${d}" fill="none" stroke="#3a2f60" stroke-width="38" stroke-linecap="round"/>
+    <path d="${d}" fill="none" stroke="#5a4c8a" stroke-width="28" stroke-linecap="round"/>
+    <path d="${d}" fill="none" stroke="#cfc4ff" stroke-opacity=".35" stroke-width="4" stroke-dasharray="14 18" stroke-linecap="round"/>
+    <path d="${dp}" fill="none" stroke="#ffd85a" stroke-opacity=".22" stroke-width="46" stroke-linecap="round" filter="url(#soft)"/>
+    <path d="${dp}" fill="none" stroke="#ffd85a" stroke-width="8" stroke-linecap="round" stroke-dasharray="1 20" class="flow"/>
+    <path id="road" d="${d}" fill="none" stroke="none"/>`;
   [['СТАРЫЕ КРЫШИ',450],['ФАБРИЧНЫЕ ТРУБЫ',1350],['БЕРЛОГА КОРОЛЯ',2150]].forEach(([t,x])=>a+=`<text x="${x}" y="${MAPH-24}" text-anchor="middle" font-size="26" fill="#ffd85a" opacity=".85" font-family="Rubik Mono One, sans-serif">${t}</text>`);
   return a;
 }
@@ -185,29 +204,42 @@ U.worldMap=function(){
   const S=K.app.save;
   const fishGot=Object.values(S.levels).reduce((a,l)=>a+(l.fish?1:0),0),fishAll=K.LEVELS.filter(l=>!l.boss).length;
   let cur=K.LEVELS.findIndex(l=>K.app.unlocked(l.id)&&!S.levels[l.id]);if(cur<0)cur=K.LEVELS.length-1;
+  mapProgress=cur;const from=Math.min(cur,S.mapPos??cur);
   const nodes=K.LEVELS.map((l,i)=>{
     const [x,y]=NODES[i],st=S.levels[l.id],open=K.app.unlocked(l.id),fr=l.friend&&K.FRIEND[l.friend],saved=fr&&S.friends.includes(fr.id);
     const cls=['mnode',l.boss?'boss':'',st?'done':'',i===cur?'next':'',open?'':'lock'].join(' ');
-    const label=l.boss?(l.boss==='king'?'👑':'☠️'):l.id;
-    const friend=fr?`<span class="mf ${saved?'saved':''}" title="${esc(fr.name)}">${saved?fr.emoji:(open?'🔒'+fr.emoji:'❔')}</span>`:'';
-    const need=l.need&&open&&!saved?`<span class="mneed">${Object.entries(l.need).map(([k,n])=>K.ITEMS[k].icon+n).join(' ')}</span>`:'';
+    const label=l.boss?(l.boss==='king'?pic('king',0,46):pic('general',0,46)):l.id;
+    const friend=fr?`<span class="mf ${saved?'saved':open?'caged':'unknown'}" title="${esc(open||saved?fr.name:'???')}">${pic(open||saved?'friend':'cage',fr.id,40,open||saved?'':'sil')}${saved?'':LOCK}</span>`:'';
+    const need=l.need&&open&&!saved?`<span class="mneed">${Object.entries(l.need).map(([k,n])=>`${itemPic(k,18)}<b>${n}</b>`).join('')}</span>`:'';
     return `<button class="${cls}" style="left:${x/MAPW*100}%;top:${y/MAPH*100}%" ${open?`data-act="level" data-id="${l.id}"`:'disabled'} aria-label="${esc(l.name)}">
-      ${friend}<span class="o">${open?label:'🔒'}</span><span class="st">${open?stars3(st&&st.stars):''}</span><span class="nm">${esc(l.name)}</span>${need}</button>`;
+      ${friend}<span class="o">${open?label:LOCK}</span><span class="st">${open?stars3(st&&st.stars):''}</span><span class="nm">${esc(l.name)}</span>${need}</button>`;
   }).join('');
   const [cx,cy]=NODES[cur];
   show(`<div class="mapui">
-    <div class="maptop safe"><button class="btn sm ghost" data-act="tab" data-tab="shop">🏠 Дом</button>
+    <div class="maptop safe"><button class="btn sm ghost" data-act="tab" data-tab="shop">Дом и лавка</button>
       <h1 class="mapt">Путь к берлоге</h1>
-      <div class="row"><span class="chip"><span class="s">★</span><b>${S.wallet}</b></span><span class="chip" title="Золотые рыбки">🐟 <b>${fishGot}/${fishAll}</b></span><span class="chip" title="Спасённые друзья">${S.friends.length?S.friends.map(id=>K.FRIEND[id].emoji).join(''):'друзей пока нет'}</span></div></div>
+      <div class="row"><span class="chip"><span class="s">★</span><b>${S.wallet}</b></span><span class="chip" title="Золотые рыбки">${pic('fish',0,20)} <b>${fishGot}/${fishAll}</b></span><span class="chip fr" title="Спасённые друзья">${S.friends.length?S.friends.map(id=>pic('friend',id,26)).join(''):'друзей пока нет'}</span></div></div>
     <div class="mapscroll" id="mapscroll"><div class="mapc">
       <svg viewBox="0 0 ${MAPW} ${MAPH}" preserveAspectRatio="none" aria-hidden="true">${mapArt()}</svg>
       ${nodes}
-      <span class="mcat" style="left:${cx/MAPW*100}%;top:${cy/MAPH*100}%">🐈</span>
-      <span class="mdog" style="left:${Math.max(2,cx-90)/MAPW*100}%;top:${(cy+30)/MAPH*100}%">🐕</span>
+      <span class="mcat" id="mcat" style="left:${cx/MAPW*100}%;top:${cy/MAPH*100}%">${pic('cat',S.skin,64)}</span>
+      <span class="mdog" id="mdog" style="left:${Math.max(2,cx-90)/MAPW*100}%;top:${(cy+30)/MAPH*100}%">${pic('dog',K.LEVELS[cur].world,52)}</span>
     </div></div>
-    <p class="maphint">Нажмите на уровень, чтобы начать. В клетках ждут друзья — для каждой клетки нужны ключи 🔑, верёвки 🪢 и кусачки ✂️.</p>
+    <p class="maphint">Нажмите на уровень, чтобы начать. В клетках ждут друзья — для каждой клетки нужны ключи, верёвки и кусачки, спрятанные на уровне.</p>
   </div>`,'');
-  const sc=$('mapscroll');if(sc){requestAnimationFrame(()=>{const c=sc.firstElementChild;sc.scrollLeft=Math.max(0,cx/MAPW*c.offsetWidth-sc.clientWidth/2)})}
+  const sc=$('mapscroll');
+  const c=sc.firstElementChild;const center=x=>Math.max(0,x/MAPW*c.offsetWidth-sc.clientWidth/2);
+  sc.scrollLeft=center(NODES[from][0]);
+  // кот идёт по дороге к новому уровню
+  if(from<cur){
+    const road=$('road'),len=road.getTotalLength();const at=i=>{let lo=0,hi=len;for(let k=0;k<22;k++){const m=(lo+hi)/2,p=road.getPointAtLength(m);if(p.x<NODES[i][0])lo=m;else hi=m}return lo};
+    const l0=at(from),l1=at(cur),cat=$('mcat'),dog=$('mdog'),t0=performance.now(),dur=900+(cur-from)*500;
+    const put=(el,l,dy)=>{const p=road.getPointAtLength(Math.max(0,l));el.style.left=p.x/MAPW*100+'%';el.style.top=(p.y+dy)/MAPH*100+'%'};
+    put(cat,l0,0);put(dog,l0-140,30);
+    const step=now=>{if(!cat.isConnected)return;const k=Math.min(1,(now-t0-300)/dur),e=k<0?0:k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;const l=l0+(l1-l0)*e;put(cat,l,0);put(dog,l-140,30);
+      sc.scrollLeft=center(road.getPointAtLength(l).x);if(k<1)requestAnimationFrame(step);else{S.mapPos=cur;K.app.persist();K.audio.sfxPlay('checkpoint')}};
+    requestAnimationFrame(step);
+  }else{S.mapPos=cur;K.app.persist()}
 };
 
 /* ---------- карточка уровня ---------- */
@@ -220,14 +252,14 @@ U.levelIntro=function(id){
     <h2>${esc(l.name)}</h2>
     <p>${esc(l.news)}</p>
     ${fr?`<p class="sub">${rescued?`${esc(fr.name)} уже дома`:`В клетке ждёт: <b>${esc(fr.name)}</b> → ${esc(fr.abilName)}`}</p>`:''}
-    ${l.need&&!rescued?`<div class="needs">${Object.entries(l.need).map(([k,n])=>`<span>${K.ITEMS[k].icon} ${esc(K.ITEMS[k].name)} ×${n}</span>`).join('')}</div><p class="sub">Вещи спрятаны на уровне — без них клетку не открыть.</p>`:''}
-    ${l.boss?'':(()=>{const story=K.LEVELS.filter(x=>!x.boss),ti=story.indexOf(l),tr=K.TRAPS[ti];return `<p class="sub">🐕 За вами бежит <b>${esc(K.CHASERS[l.world].name)}</b>. Ловушка уровня: ${tr.icon} <b>${esc(tr.name)}</b> ×${tr.charges} — ${esc(tr.desc.toLowerCase())}.</p>`})()}
+    ${l.need&&!rescued?`<div class="needs">${Object.entries(l.need).map(([k,n])=>`<span>${itemPic(k,26)} ${esc(K.ITEMS[k].name)} ×${n}</span>`).join('')}</div><p class="sub">Вещи спрятаны на уровне — без них клетку не открыть.</p>`:''}
+    ${l.boss?'':(()=>{const story=K.LEVELS.filter(x=>!x.boss),ti=story.indexOf(l),tr=K.TRAPS[ti];return `<div class="introw">${pic('dog',l.world,56)}<p class="sub">За вами бежит <b>${esc(K.CHASERS[l.world].name)}</b>.</p>${pic('trap',ti,44)}<p class="sub">Ловушка: <b>${esc(tr.name)}</b> ×${tr.charges}<br>${esc(tr.desc)}</p></div>`})()}
     ${st?`<div class="goals" style="width:100%"><div class="kv"><span>Оценка</span><b style="color:var(--star)">${stars3(st.stars)}</b></div>
       <div class="kv"><span>Лучшее время</span><b>${st.time?fmtT(st.time):'—'}</b></div><div class="kv"><span>Норматив</span><b>${fmtT(K.app.parOf(id))}</b></div>
-      ${l.boss?'':`<div class="kv"><span>Золотая рыбка</span><b>${st.fish?'найдена 🐟':'ищите…'}</b></div>`}</div>`:''}
+      ${l.boss?'':`<div class="kv"><span>Золотая рыбка</span><b>${st.fish?'найдена '+pic('fish',0,18):(()=>{const f=K.buildLevel(l).fish[0];const g=f&&K.ABIL_FRIEND[f.gate];return g&&!K.app.save.friends.includes(g.id)?`нужно умение «${esc(g.abilName)}» `+pic('friend',g.id,22):'ищите…'})()}</b></div>`}</div>`:''}
     <div class="row"><button class="btn" data-act="play" data-id="${id}" autofocus>Играть</button>
-    ${st?`<button class="btn ghost" data-act="time" data-id="${id}">На время${S.ghosts[id]?' 👻':''}</button>`:''}
-    <button class="btn ghost" data-act="hub">Назад</button></div></div>`);
+    ${st?`<button class="btn ghost" data-act="time" data-id="${id}">На время${S.ghosts[id]?' (с призраком)':''}</button>`:''}
+    <button class="btn ghost" data-act="tab" data-tab="map">Назад</button></div></div>`);
 };
 
 /* ---------- в игре ---------- */
@@ -249,7 +281,7 @@ U.gameOver=function(mode){
 };
 U.rescue=function(id){
   const f=K.FRIEND[id];
-  show(`<div class="card"><span class="portrait">${f.icon}</span><p class="sub">Друг спасён!</p><h2>${esc(f.name)}</h2>
+  show(`<div class="card"><span class="portrait">${pic('friend',f.id,96)}</span><p class="sub">Друг спасён!</p><h2>${esc(f.name)}</h2>
     <p>«${esc(f.line)}»</p><p><b style="color:var(--star)">Новое умение: ${esc(f.abilName)}</b></p><p class="sub">${esc(f.how)}</p>
     <button class="btn" data-act="resume" autofocus>Ура!</button></div>`);
 };
@@ -286,7 +318,8 @@ U.ending=function(){
 };
 U.story=function(key,i,done){
   const P=K.STORY[key],p=P[i],last=i===P.length-1;
-  show(`<div class="card story"><div class="art">${p.art}</div><p class="t">${esc(p.text)}</p>
+  const img=K.render.illustrate(p.scene,960,420);
+  show(`<div class="card story"><img class="art" src="${img}" alt=""><p class="t">${esc(p.text)}</p>
     <div class="dots">${P.map((_,k)=>`<i class="${k===i?'on':''}"></i>`).join('')}</div>
     <div class="row"><button class="btn" data-act="storyNext" autofocus>${last?'В путь!':'Дальше'}</button>${last?'':'<button class="btn ghost" data-act="storySkip">Пропустить</button>'}</div></div>`);
   U._story={key,i,done};
@@ -311,12 +344,13 @@ U.hud=function(){
   $('hScore').textContent=G.score;
   $('hTime').textContent=t;
   const par=K.app.currentPar();$('hTimeChip').style.color=par&&G.time/60>par?'var(--muted)':'';
-  $('hAbil').innerHTML=K.FRIENDS.filter(f=>G.abil.has(f.abil)).map(f=>`<span title="${esc(f.abilName)}">${f.icon}</span>`).join('');
+  $('hAbil').innerHTML=K.FRIENDS.filter(f=>G.abil.has(f.abil)).map(f=>`<span title="${esc(f.abilName)}">${pic('friend',f.id,24)}</span>`).join('');
   const c=$('hCombo');if(G.combo>=2){if(c.dataset.n!=G.combo){c.textContent=`КОМБО ×${Math.min(8,G.combo)}`;c.className='combo';void c.offsetWidth;c.className='combo on';c.dataset.n=G.combo}}else if(c.dataset.n!=='0'){c.className='combo';c.dataset.n='0'}
   $('tDash').hidden=!G.abil.has('dash');$('tPaw').hidden=!G.abil.has('paw');$('tTrap').hidden=!(G.trapDef&&G.chase);
   const needK=Object.keys(G.need||{});const hi=$('hItems');hi.hidden=!needK.length;
-  if(needK.length)hi.innerHTML=needK.map(k=>{const h=G.have[k]||0,n=G.need[k];return `<span class="${h>=n?'ok':''}">${K.ITEMS[k].icon} ${h}/${n}</span>`}).join('');
-  const ht=$('hTrap');ht.hidden=!(G.trapDef&&G.chase);if(G.trapDef)ht.innerHTML=`${G.trapDef.icon} ×${G.trapsLeft}`;
+  if(needK.length)hi.innerHTML=needK.map(k=>{const h=G.have[k]||0,n=G.need[k];return `<span class="${h>=n?'ok':''}">${itemPic(k,22)} ${h}/${n}</span>`}).join('');
+  const ht=$('hTrap');ht.hidden=!(G.trapDef&&G.chase);if(G.trapDef)ht.innerHTML=`${pic('trap',G.trapTier,24)} ×${G.trapsLeft}`;
+  const hdi=$('hDogI');if(G.chase&&hdi.dataset.l!=G.chase.look){hdi.innerHTML=pic('dog',G.chase.look,24);hdi.dataset.l=G.chase.look}
 };
 U.hudFast=function(){
   const G=K.G;if(!G.P)return;
@@ -326,7 +360,7 @@ U.hudFast=function(){
   if(G.items&&G.state==='play'){for(const it of G.items){if(it.got||Math.abs(it.x-G.P.x)>20*16)continue;
     const p=K.render.toScreen(it.x,it.y);const off=p.x<3||p.x>97||p.y<8||p.y>95;
     const x=Math.max(3,Math.min(97,p.x)),y=Math.max(10,Math.min(92,p.y));
-    if(off||K.render.inDark)html+=`<span class="mark ${off?'edge':''}" style="left:${x}%;top:${y}%">${K.ITEMS[it.type].icon}</span>`}}
+    if(off||K.render.inDark)html+=`<span class="mark ${off?'edge':''}" style="left:${x}%;top:${y}%">${itemPic(it.type,off?24:30)}</span>`}}
   if(mk._h!==html){mk.innerHTML=html;mk._h=html}
   const dk=$('dark');let inDark=false;const cx=G.P.x+6;
   for(const d of G.darks||[])if(cx>d.x0-8&&cx<d.x1+8)inDark=true;
@@ -344,7 +378,7 @@ U.pop=function(e){
 let bannerT;
 U.banner=function(h,p=''){const b=$('banner');$('bannerH').textContent=h;$('bannerP').textContent=p;b.className='banner';void b.offsetWidth;b.className='banner on';clearTimeout(bannerT);bannerT=setTimeout(()=>b.className='banner',2300)};
 let toastT;
-U.toast=function(t){const el=$('toast');el.textContent=t;el.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('on'),2200)};
+U.toast=function(t,html){const el=$('toast');if(html)el.innerHTML=html+' '+esc(t);else el.textContent=t;el.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('on'),2200)};
 U.flash=function(white){const f=$('flash');f.className='flash'+(white?' w':'');f.style.transition='none';f.style.opacity=white?.5:.35;requestAnimationFrame(()=>{f.style.transition='opacity .35s';f.style.opacity=0})};
 U.bossBar=function(B){const bb=$('bossbar');if(!B){bb.hidden=true;return}bb.hidden=false;$('bossHp').style.width=(Math.max(0,B.hp)/B.maxHp*100)+'%'};
 U.onEvent=function(e){
@@ -360,16 +394,17 @@ U.onEvent=function(e){
     case 'fish':U.banner('Золотая рыбка!','+500 очков');break;
     case 'comboEnd':if(e.n>=3)U.banner(`Комбо ×${e.n}!`,e.n>=5?'Невероятно!':'Отлично!');break;
     case 'shieldBreak':U.toast('Щит Колючки спас вас!');break;
-    case 'item':U.toast(`${K.ITEMS[e.type].icon} ${K.ITEMS[e.type].name}: ${e.have}/${e.need}`);if(K.cageReady())setTimeout(()=>U.banner('Всё собрано!','Бегите к клетке'),600);break;
-    case 'kit':U.toast('🧰 +1 ловушка');break;
+    case 'item':U.toast(`${K.ITEMS[e.type].name}: ${e.have}/${e.need}`,itemPic(e.type,26));if(K.cageReady())setTimeout(()=>U.banner('Всё собрано!','Бегите к клетке'),600);break;
+    case 'kit':U.toast('+1 ловушка',itemPic('kit',26));break;
+    case 'fishLocked':{const g=K.ABIL_FRIEND[e.gate];if(g)U.banner('Золотая рыбка под замком',`Нужно умение «${g.abilName}» (${g.name}). Вернитесь сюда, когда спасёте друга`);break}
     case 'hint':{const h={double:['Двойной прыжок!','Нажмите прыжок ещё раз прямо в воздухе'],wall:['Прыжок от стены!','Прыгните к стене и жмите прыжок, касаясь её'],glide:['Планируйте!','Удерживайте прыжок, пока падаете']}[e.k];if(h)U.banner(h[0],h[1]);break}
-    case 'chaserWake':U.toast('🐕 В будке кто-то проснулся…');break;
-    case 'cageLocked':U.banner('Клетка заперта',Object.entries(e.missing).map(([k,n])=>`${K.ITEMS[k].icon}×${n}`).join('  ')+' — вернитесь и поищите');break;
-    case 'chaserStart':U.banner(`${e.name} идёт по следу!`,K.G.trapDef?`Ставьте ловушки: ${matchMedia('(pointer:coarse)').matches?'кнопка 🪤':'клавиша C'}`:'Не останавливайтесь!');break;
-    case 'chaserHowl':U.toast('🐕 Пёс готовится к рывку!');break;
+    case 'chaserWake':U.toast('В будке кто-то проснулся…',pic('dog',K.G.chase?K.G.chase.look:0,26));break;
+    case 'cageLocked':U.banner('Клетка заперта','Не хватает: '+Object.entries(e.missing).map(([k,n])=>`${K.ITEMS[k].name.toLowerCase()} ×${n}`).join(', ')+'. Вернитесь и поищите');break;
+    case 'chaserStart':U.banner(`${e.name} идёт по следу!`,K.G.trapDef?`Ставьте ловушки: ${matchMedia('(pointer:coarse)').matches?'кнопка «Ловушка»':'клавиша C'}`:'Не останавливайтесь!');break;
+    case 'chaserHowl':U.toast('Пёс готовится к рывку!',pic('dog',K.G.chase?K.G.chase.look:0,26));break;
     case 'chaserBite':U.flash();break;
-    case 'trapSnap':U.toast(`${K.TRAPS[e.tier].icon} Пёс попался!`);break;
-    case 'trapNo':U.toast(e.reason==='empty'?'Ловушки кончились — ищите 🧰':e.reason==='air'?'Ловушку ставят на земле':'Здесь некого ловить');break;
+    case 'trapSnap':U.toast('Пёс попался!',pic('trap',e.tier,26));break;
+    case 'trapNo':U.toast(e.reason==='empty'?'Ловушки кончились — ищите наборы ловушек':e.reason==='air'?'Ловушку ставят на земле':'Здесь некого ловить');break;
   }
 };
 })(window.KOT=window.KOT||{});

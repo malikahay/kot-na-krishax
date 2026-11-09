@@ -141,11 +141,11 @@ const CH={
     for(let r=t-1;r>nt;r-=2)b.star(b.x-1,r);b.roof(b.ri(6,9),nt);b.foeAuto(b.x-3,nt);
   },
   dblGap(b){
-    b.roof(b.ri(5,7));const t=b.top,g=b.ri(5,6),nt=Math.min(11,t+b.ri(0,1));
+    b.roof(b.ri(5,7));const t=b.top,g=4,nt=Math.min(11,t+b.ri(0,1));
     b.starArc(b.x-1,t-1,b.x+g,nt-1,4);b.gap(g);b.roof(b.ri(6,8),nt);
   },
   glideGap(b){
-    const t0=Math.max(5,b.top-b.ri(0,1));b.roof(b.ri(5,7),t0);const g=b.ri(8,11),nt=Math.min(11,t0+b.ri(1,2));
+    const t0=Math.max(5,b.top-b.ri(0,1));b.roof(b.ri(5,7),t0);const g=b.ri(6,8),nt=Math.min(11,t0+b.ri(1,2));
     b.starArc(b.x-1,t0-1,b.x+g,nt-1,3);b.gap(g);b.roof(b.ri(6,9),nt);
   },
   updraft(b){
@@ -154,7 +154,7 @@ const CH={
     b.gap(w);b.roof(b.ri(7,9),nt);b.foeAuto(b.x-3,nt);
   },
   dashGap(b){
-    b.roof(b.ri(5,7));const t=b.top,g=b.ri(6,7);
+    b.roof(b.ri(5,7));const t=b.top,g=b.ri(5,6);
     b.starLine(b.x,g,t-3);b.gap(g);b.roof(b.ri(6,8),t);
   },
   dashArmor(b){
@@ -290,9 +290,9 @@ function placeItems(L,def,r){
 function arena(kind){
   const W=kind==='king'?48:44;const b=Builder(kind==='king'?99:88,W+2);
   b.rect(0,0,2,ROWS);b.rect(W-2,0,2,ROWS);b.fill(2,W-4,11);
-  b.plank(7,7,5);b.plank(W-12,7,5);b.plank(Math.floor(W/2)-3,4,6);
-  if(kind==='king'){b.plank(3,9,3);b.plank(W-6,9,3)}
-  b.starLine(8,4,6);b.starLine(W-11,4,6);b.starLine(Math.floor(W/2)-2,4,3);
+  const M=Math.floor(W/2);
+  b.plank(6,8,5);b.plank(W-11,8,5);b.plank(13,6,4);b.plank(W-17,6,4);b.plank(M-3,4,6);
+  b.starLine(7,4,7);b.starLine(W-10,4,7);b.starLine(13,4,5);b.starLine(W-17,4,5);b.starLine(M-2,4,3);
   b.heart(4,9);b.heart(W-5,9);
   const L=b.L;L.w=W;L.start={col:5,top:11};L.boss={type:kind,col:W-10};L.arena=true;
   L.blds.push({x0:2,w:W-4,top:11,tone:.5});
