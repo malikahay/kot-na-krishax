@@ -17,7 +17,8 @@ function show(html,cls='dim'){const s=scr();s.className='screen '+cls;s.innerHTM
   const f=s.querySelector('[autofocus]')||s.querySelector('.btn');if(f)try{f.focus({preventScroll:true})}catch(e){}}
 U.hide=function(){scr().hidden=true;scr().innerHTML=''};
 U.fadeTo=function(fn){const f=$('fade');f.classList.add('on');setTimeout(()=>{try{fn()}finally{requestAnimationFrame(()=>setTimeout(()=>f.classList.remove('on'),60))}},300)};
-U.zoomNode=function(id,fn){const i=K.LEVEL[id].index,c=document.querySelector('.mapc');if(!c){fn();return}const [x,y]=NODES[i];c.style.transformOrigin=`${x/MAPW*100}% ${y/MAPH*100}%`;c.style.transform='scale(1.35)';c.classList.add('zoom');setTimeout(fn,380)};
+let rzT;addEventListener('resize',()=>{clearTimeout(rzT);rzT=setTimeout(()=>{if(document.querySelector('.mapui'))U.worldMap()},250)});
+U.zoomNode=function(id,fn){const i=K.LEVEL[id].index,c=document.querySelector('.mapc');if(!c){fn();return}const [x,y]=NODES[i];c.style.transformOrigin=`${(x+OFF)/VW*100}% ${y/MAPH*100}%`;c.style.transform='scale(1.35)';c.classList.add('zoom');setTimeout(fn,380)};
 U.visible=()=>!scr().hidden;
 
 /* ---------- титульный экран ---------- */
@@ -159,7 +160,7 @@ U.shopState=()=>({cat:shopCat,sel:shopSel});
 const MAPW=900,STEP=190,TOPPAD=260;
 const MAPH=TOPPAD+(K.LEVELS.length-1)*STEP+220;
 const NODES=K.LEVELS.map((l,i)=>[Math.round(450+Math.sin(i*1.05+.4)*250),TOPPAD+i*STEP]);
-let mapProgress=0;
+let mapProgress=0,VW=900,OFF=0;
 const zoneY=w=>{const idx=K.LEVELS.map((l,i)=>[l,i]).filter(([l])=>l.world===w).map(([,i])=>i);return [NODES[idx[0]][1]-150,NODES[idx[idx.length-1]][1]+95]};
 function roadPath(upto){
   const P=NODES.slice(0,upto+1);let d=`M${P[0][0]} ${P[0][1]}`;
@@ -184,12 +185,12 @@ function mapArt(){
    <linearGradient id="mist" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cfe8ff" stop-opacity="0"/><stop offset=".5" stop-color="#cfe8ff" stop-opacity=".10"/><stop offset="1" stop-color="#cfe8ff" stop-opacity="0"/></linearGradient>
    <filter id="soft"><feGaussianBlur stdDeviation="8"/></filter>
   </defs>
-  <rect width="${MAPW}" height="${H}" fill="url(#sky)"/>`;
+  <rect x="0" width="${VW}" height="${H}" fill="url(#sky)"/>`;
   // звёзды гаснут к низу города
-  for(let i=0;i<160;i++){const y=R()*(b1+80),x=R()*MAPW;a+=`<circle cx="${x|0}" cy="${y|0}" r="${R()<.15?2:1}" fill="#fff" opacity="${((1-y/(b1+120))*.9).toFixed(2)}"/>`}
-  a+=`<circle cx="720" cy="140" r="150" fill="url(#moon)"/><circle cx="720" cy="140" r="56" fill="#fff3c4"/><circle cx="745" cy="122" r="48" fill="#0b0820"/>`;
+  for(let i=0;i<Math.round(160*VW/900);i++){const y=R()*(b1+80),x=R()*VW;a+=`<circle cx="${x|0}" cy="${y|0}" r="${R()<.15?2:1}" fill="#fff" opacity="${((1-y/(b1+120))*.9).toFixed(2)}"/>`}
+  const mx=OFF+720+Math.min(OFF*.5,200);a+=`<circle cx="${mx}" cy="140" r="150" fill="url(#moon)"/><circle cx="${mx}" cy="140" r="56" fill="#fff3c4"/><circle cx="${mx+25}" cy="122" r="48" fill="#0b0820"/>`;
   // силуэты зданий по краям: город → фабрики
-  const side=(y0,y1,col,lit,kind)=>{for(const left of [true,false]){let y=y0;while(y<y1){const h=60+R()*90,w=90+R()*150,x=left?-10:MAPW-w+10;
+  const side=(y0,y1,col,lit,kind)=>{for(const left of [true,false]){let y=y0;while(y<y1){const h=60+R()*90,w=90+R()*150+OFF*(.3+R()*.6),x=left?-10:VW-w+10;
       a+=`<rect x="${x|0}" y="${y|0}" width="${w|0}" height="${(h+6)|0}" fill="${col}" opacity=".9"/><rect x="${x|0}" y="${y|0}" width="${w|0}" height="5" fill="${lit}" opacity=".55"/>`;
       for(let wy=y+16;wy<y+h-8;wy+=18)for(let wx=x+12;wx<x+w-12;wx+=16)if(R()<.28)a+=`<rect x="${wx|0}" y="${wy|0}" width="6" height="8" fill="${kind==='f'?'#8cffd2':'#ffcf6b'}" opacity=".75"/>`;
       if(kind==='f'&&R()<.6){const cx=left?x+w-40:x+24,ch=50+R()*60;a+=`<rect x="${cx|0}" y="${(y-ch)|0}" width="14" height="${ch|0}" fill="${col}"/><rect x="${(cx-2)|0}" y="${(y-ch)|0}" width="18" height="6" fill="#e85a3a" opacity=".7"/>`;for(let k=0;k<3;k++)a+=`<circle cx="${(cx+7+(left?12:-12)*k)|0}" cy="${(y-ch-14-k*18)|0}" r="${9+k*6}" fill="#bfe8e0" opacity="${(.16-k*.04).toFixed(2)}"/>`}
@@ -197,15 +198,15 @@ function mapArt(){
       y+=h*.75+R()*30}}};
   side(a1+120,b1+40,'#231b55','#8f80e0','c');side(a2-20,b2+30,'#163838','#6fd6c0','f');
   // переходы: туман между зонами
-  [b1+10,b2+20].forEach(y=>a+=`<rect x="0" y="${y-110}" width="${MAPW}" height="220" fill="url(#mist)"/>`);
+  [b1+10,b2+20].forEach(y=>a+=`<rect x="0" y="${y-110}" width="${VW}" height="220" fill="url(#mist)"/>`);
   // берлога: каменный свод, сталактиты, кристаллы, грибы
-  a+=`<path d="M0 ${a3} ${Array.from({length:19},(_,i)=>`L${i*50+25} ${a3+40+R()*90|0} L${i*50+50} ${a3+20}`).join(' ')} L${MAPW} ${a3-60} L${MAPW} ${a3-140} Q450 ${a3-30} 0 ${a3-140}Z" fill="#0c0616"/>`;
-  for(const left of [true,false]){let y=a3+80;while(y<H){const w=60+R()*120,h=80+R()*120,x=left?-10:MAPW-w+10;a+=`<path d="M${x} ${y+h} Q${x+w/2} ${y-h*.2} ${x+w} ${y+h}Z" fill="#170c26"/>`;y+=h*.7}}
-  for(let i=0;i<40;i++){const left=R()<.5,x=left?20+R()*170:MAPW-190+R()*170,y=a3+120+R()*(H-a3-160),sz=8+R()*18,c=R()<.5?'#9a6aff':'#5affd0';
+  const nT=Math.ceil(VW/50);a+=`<path d="M0 ${a3} ${Array.from({length:nT},(_,i)=>`L${i*50+25} ${a3+40+R()*90|0} L${i*50+50} ${a3+20}`).join(' ')} L${VW} ${a3-60} L${VW} ${a3-140} Q${VW/2} ${a3-30} 0 ${a3-140}Z" fill="#0c0616"/>`;
+  for(const left of [true,false]){let y=a3+80;while(y<H){const w=60+R()*120+OFF*.8,h=80+R()*120,x=left?-10:VW-w+10;a+=`<path d="M${x} ${y+h} Q${x+w/2} ${y-h*.2} ${x+w} ${y+h}Z" fill="#170c26"/>`;y+=h*.7}}
+  for(let i=0;i<Math.round(40*VW/900);i++){const left=R()<.5,band=170+OFF,x=left?20+R()*band:VW-20-R()*band,y=a3+120+R()*(H-a3-160),sz=8+R()*18,c=R()<.5?'#9a6aff':'#5affd0';
     a+=`<circle cx="${x|0}" cy="${y|0}" r="${sz*3|0}" fill="url(#${c==='#9a6aff'?'glowP':'glowG'})"/><path d="M${x|0} ${(y-sz*1.9)|0} L${(x+sz*.6)|0} ${y|0} L${x|0} ${(y+sz*.5)|0} L${(x-sz*.6)|0} ${y|0}Z" fill="${c}" opacity=".85"/>`}
-  for(let i=0;i<14;i++){const x=40+R()*820,y=a3+160+R()*(H-a3-200);if(x>220&&x<680)continue;a+=`<rect x="${x|0}" y="${y|0}" width="4" height="14" fill="#d8d0c0"/><ellipse cx="${(x+2)|0}" cy="${y|0}" rx="10" ry="6" fill="#5affd0" opacity=".85"/>`}
+  for(let i=0;i<Math.round(14*VW/900);i++){const x=40+R()*(VW-80),y=a3+160+R()*(H-a3-200);if(x>OFF+220&&x<OFF+680)continue;a+=`<rect x="${x|0}" y="${y|0}" width="4" height="14" fill="#d8d0c0"/><ellipse cx="${(x+2)|0}" cy="${y|0}" rx="10" ry="6" fill="#5affd0" opacity=".85"/>`}
   // логово Короля внизу
-  const ky=NODES[NODES.length-1][1];a+=`<ellipse cx="450" cy="${ky+30}" rx="250" ry="130" fill="#000" opacity=".55" filter="url(#soft)"/>`;
+  const ky=NODES[NODES.length-1][1];a+=`<g transform="translate(${OFF},0)">`+`<ellipse cx="450" cy="${ky+30}" rx="250" ry="130" fill="#000" opacity=".55" filter="url(#soft)"/>`;
   // дорога
   const d=roadPath(NODES.length-1),dp=roadPath(Math.max(0,mapProgress));
   a+=`<path d="${d}" fill="none" stroke="#000" stroke-opacity=".45" stroke-width="46" stroke-linecap="round" transform="translate(0,9)"/>
@@ -214,11 +215,12 @@ function mapArt(){
     <path d="${d}" fill="none" stroke="#d8ceff" stroke-opacity=".35" stroke-width="4" stroke-dasharray="14 18" stroke-linecap="round"/>
     <path d="${dp}" fill="none" stroke="#ffd85a" stroke-opacity=".25" stroke-width="48" stroke-linecap="round" filter="url(#soft)"/>
     <path d="${dp}" fill="none" stroke="#ffd85a" stroke-width="8" stroke-linecap="round" stroke-dasharray="1 20" class="flow"/>
-    <path id="road" d="${d}" fill="none" stroke="none"/>`;
+    <path id="road" d="${d}" fill="none" stroke="none"/></g>`;
   return a;
 }
 U.worldMap=function(){
   const S=K.app.save;
+  {const sw=Math.max(320,(scr().clientWidth||innerWidth)),k=Math.min(980,sw)/900;VW=Math.max(900,Math.round(sw/k));OFF=(VW-900)/2}
   const fishGot=Object.values(S.levels).reduce((a,l)=>a+(l.fish?1:0),0),fishAll=K.FISH_LEVELS.length;
   let cur=K.LEVELS.findIndex(l=>K.app.unlocked(l.id)&&!S.levels[l.id]);if(cur<0)cur=K.LEVELS.length-1;
   mapProgress=cur;const from=Math.min(cur,S.mapPos??cur);
@@ -228,7 +230,7 @@ U.worldMap=function(){
     const label=l.boss?(l.boss==='king'?pic('king',0,50):pic('general',0,50)):l.tutorial?'?':l.id;
     const friend=fr?`<span class="mf ${saved?'saved':open?'caged':'unknown'}" title="${esc(open||saved?fr.name:'???')}">${pic(open||saved?'friend':'cage',fr.id,40,open||saved?'':'sil')}${saved?'':LOCK}</span>`:'';
     const need=l.need&&open&&!saved&&!st?`<span class="mneed">${Object.entries(l.need).map(([k,n])=>`${itemPic(k,18)}<b>${n}</b>`).join('')}</span>`:'';
-    return `<button class="${cls}" style="left:${x/MAPW*100}%;top:${y/MAPH*100}%" ${open?`data-act="level" data-id="${l.id}"`:'disabled'} aria-label="${esc(l.name)}">
+    return `<button class="${cls}" style="left:${(x+OFF)/VW*100}%;top:${y/MAPH*100}%" ${open?`data-act="level" data-id="${l.id}"`:'disabled'} aria-label="${esc(l.name)}">
       <span class="o">${open?label:LOCK}</span><span class="info"><span class="nm">${esc(l.name)}</span><span class="st">${open?stars3(st&&st.stars):''}</span>${need}</span>${friend}</button>`;
   }).join('');
   const zones=K.WORLDS.map((w,wi)=>{const [y0]=zoneY(wi);return `<div class="zone" style="top:${(y0+20)/MAPH*100}%"><span class="zn">Этап ${wi+1}</span><b>${esc(w.name)}</b><span class="zs">${esc(w.sub)}</span></div>`}).join('');
@@ -238,18 +240,18 @@ U.worldMap=function(){
       <h1 class="mapt">Путь к берлоге</h1>
       <div class="row"><span class="chip"><span class="s">★</span><b>${S.wallet}</b></span><span class="chip" title="Золотые рыбки">${pic('fish',0,20)} <b>${fishGot}/${fishAll}</b></span><span class="chip fr" title="Спасённые друзья">${S.friends.length?S.friends.map(id=>pic('friend',id,26)).join(''):'друзей пока нет'}</span></div></div>
     <div class="mapscroll" id="mapscroll"><div class="mapc">
-      <svg viewBox="0 0 ${MAPW} ${MAPH}" preserveAspectRatio="none" aria-hidden="true">${mapArt()}</svg>
+      <svg viewBox="0 0 ${VW} ${MAPH}" preserveAspectRatio="none" aria-hidden="true">${mapArt()}</svg>
       ${zones}${nodes}
-      <span class="mcat" id="mcat" style="left:${cx/MAPW*100}%;top:${cy/MAPH*100}%">${pic('cat',S.skin,64)}</span>
-      <span class="mdog" id="mdog" style="left:${cx/MAPW*100}%;top:${(cy-100)/MAPH*100}%">${pic('dog',K.LEVELS[cur].world,52)}</span>
+      <span class="mcat" id="mcat" style="left:${(cx+OFF)/VW*100}%;top:${cy/MAPH*100}%">${pic('cat',S.skin,64)}</span>
+      <span class="mdog" id="mdog" style="left:${(cx+OFF)/VW*100}%;top:${(cy-100)/MAPH*100}%">${pic('dog',K.LEVELS[cur].world,52)}</span>
     </div></div>
   </div>`,'');
-  const sc=$('mapscroll'),c=sc.firstElementChild;c.style.aspectRatio=`${MAPW}/${MAPH}`;const center=y=>Math.max(0,y/MAPH*c.offsetHeight-sc.clientHeight/2);
+  const sc=$('mapscroll'),c=sc.firstElementChild;c.style.aspectRatio=`${VW}/${MAPH}`;const center=y=>Math.max(0,y/MAPH*c.offsetHeight-sc.clientHeight/2);
   sc.scrollTop=center(NODES[from][1]);
   const road=$('road'),len=road.getTotalLength();
   const at=i=>{let lo=0,hi=len;for(let k=0;k<24;k++){const m=(lo+hi)/2;if(road.getPointAtLength(m).y<NODES[i][1])lo=m;else hi=m}return lo};
   const cat=$('mcat'),dog=$('mdog');
-  const put=(el,l,dy)=>{const p=road.getPointAtLength(Math.max(0,Math.min(len,l)));el.style.left=p.x/MAPW*100+'%';el.style.top=(p.y+dy)/MAPH*100+'%'};
+  const put=(el,l,dy)=>{const p=road.getPointAtLength(Math.max(0,Math.min(len,l)));el.style.left=(p.x+OFF)/VW*100+'%';el.style.top=(p.y+dy)/MAPH*100+'%'};
   if(from<cur){
     const l0=at(from),l1=at(cur),t0=performance.now(),dur=1000+(cur-from)*600;put(cat,l0,0);put(dog,l0-160,0);
     const step=now=>{if(!cat.isConnected)return;const k=Math.min(1,(now-t0-350)/dur),e=k<0?0:k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;const l=l0+(l1-l0)*e;put(cat,l,0);put(dog,l-160,0);
@@ -429,3 +431,4 @@ U.onEvent=function(e){
   }
 };
 })(window.KOT=window.KOT||{});
+
