@@ -43,8 +43,8 @@ app.play=function(id,mode='story'){
   const th=K.WORLDS[def.world].theme;
   const story=K.LEVELS.filter(l=>!l.boss),tier=story.indexOf(def);
   const bt=def.world*3+2;
-  const chase=def.boss?{tier:bt,look:def.world,speed:.92,lunge:0}:{tier,look:def.world,speed:1.04+tier*.015,lunge:def.world>=1?Math.max(300,620-tier*35):0};
-  enterLevel(L,th,def.boss?(def.boss==='king'?'king':'boss'):th.music,{mode,abil:abilities(),skipCage,ghost,chase,trapTier:def.boss?bt:tier});
+  const chase=def.boss?null:{tier,look:def.world,speed:1.04+tier*.015,lunge:def.world>=1?Math.max(300,620-tier*35):0};
+  enterLevel(L,th,def.boss?(def.boss==='king'?'king':'boss'):th.music,{mode,abil:abilities(),skipCage,ghost,chase,trapTier:def.boss?-1:tier});
   if(mode==='time')UI.toast(ghost?'Обгоните своего призрака!':'Первый забег на время — призрак появится в следующий раз');
 };
 app.playDaily=function(){
