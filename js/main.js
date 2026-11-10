@@ -8,9 +8,10 @@ const ALL=K.FRIENDS.map(f=>f.abil);
 
 /* ---------- сохранение ---------- */
 const SAVE_KEY='kot-save-v2';
-function defaults(){return {opts:{dog:'normal',friends:true},wallet:0,levels:{},friends:[],owned:[],skin:{color:'ginger',hat:'none',tail:'normal'},daily:{},endless:{dist:0,score:0},ghosts:{},seenIntro:false,king:false}}
+function defaults(){return {ver:3,opts:{dog:'normal',friends:true},wallet:0,levels:{},friends:[],owned:[],skin:{color:'ginger',hat:'none',tail:'normal'},daily:{},endless:{dist:0,score:0},ghosts:{},seenIntro:false,king:false}}
 let S;
 try{S=Object.assign(defaults(),JSON.parse(localStorage.getItem(SAVE_KEY)||'{}'))}catch(e){S=defaults()}
+if((S.ver||1)<3){const M=K.LEVEL_MIGRATE,mv=o=>{const n={};for(const k in o)n[M[k]||k]=o[k];return n};S.levels=mv(S.levels);S.ghosts=mv(S.ghosts||{});if(S.levels['1-1'])S.levels['1-0']=S.levels['1-0']||{stars:[true,false,false],time:0,score:0,fish:false};delete S.mapPos;S.ver=3;try{localStorage.setItem(SAVE_KEY,JSON.stringify(S))}catch(e){}}
 app.save=S;
 function persist(){try{localStorage.setItem(SAVE_KEY,JSON.stringify(S))}catch(e){
   // при переполнении хранилища выкидываем призраков
@@ -24,7 +25,7 @@ const owned=(cat,id)=>{const it=K.SKINS[cat].find(i=>i.id===id);return it&&(!it.
 let cur=null,pendingEnding=false;
 app.currentPar=()=>cur&&G.L?G.L.par:0;
 function abilities(){return S.friends.map(id=>K.FRIEND[id].abil)}
-function bestTrap(){const story=K.LEVELS.filter(l=>!l.boss);let t=0;story.forEach((l,i)=>{if(S.levels[l.id])t=i});return t}
+function bestTrap(){let t=0;K.STORY_LEVELS.forEach(l=>{if(S.levels[l.id])t=Math.max(t,K.trapTierOf(l))});return t}
 function enterLevel(L,theme,music,opts){
   const O=S.opts||{};if(opts.chase){if(O.dog==='off')opts.chase=null;else if(O.dog==='easy')opts.chase={...opts.chase,easy:true,speed:opts.chase.speed*.85,lunge:0}}
   K.startLevel(L,opts);
@@ -41,9 +42,8 @@ app.play=function(id,mode='story'){
   const skipCage=def.friend&&S.friends.includes(def.friend);
   const ghost=mode==='time'&&S.ghosts[id]?K.ghostDecode(S.ghosts[id]):null;
   const th=K.WORLDS[def.world].theme;
-  const story=K.LEVELS.filter(l=>!l.boss),tier=story.indexOf(def);
-  const bt=def.world*3+2;
-  const chase=def.boss?null:{tier,look:def.world,speed:1.04+tier*.015,lunge:def.world>=1?Math.max(300,620-tier*35):0};
+  const tier=K.trapTierOf(def);
+  const chase=def.boss?null:def.tutorial?{tier:0,look:0,speed:.8,lunge:0,easy:true}:{tier,look:def.world,speed:1.04+tier*.015,lunge:def.world>=1?Math.max(300,620-tier*35):0};
   enterLevel(L,th,def.boss?(def.boss==='king'?'king':'boss'):th.music,{mode,abil:abilities(),skipCage,ghost,chase,trapTier:def.boss?-1:tier});
   if(mode==='time')UI.toast(ghost?'Обгоните своего призрака!':'Первый забег на время — призрак появится в следующий раз');
 };
@@ -63,7 +63,7 @@ app.toHub=function(t){
   R.setTheme(K.HUB_THEME);R.setSkin(S.skin);R.buildHub(G,S.friends);
   A.play('hub');UI.hub(t||'map');
 };
-function withStory(id,go){const key={'1-1':'intro','2-1':'world2','3-1':'world3'}[id];S.seen=S.seen||{};if(key&&!S.seen[key]){S.seen[key]=true;persist();UI.story(key,0,go)}else go()}
+function withStory(id,go){const key={'1-0':'intro','2-1':'world2','3-1':'world3'}[id];S.seen=S.seen||{};if(key&&!S.seen[key]){S.seen[key]=true;persist();UI.story(key,0,go)}else go()}
 function restart(){if(!cur)return;if(cur.mode==='daily')app.playDaily();else if(cur.mode==='endless')app.playEndless();else app.play(cur.id,cur.mode)}
 function pause(){if(G.state==='play'&&cur){G.state='pause';UI.pause();app.platformGameplay(false)}else if(G.state==='pause')resume()}
 function resume(){if(G.state==='pause'||G.state==='rescue'){G.state='play';UI.hide();K.input.taps.jump=0;app.platformGameplay(true)}}
@@ -84,12 +84,12 @@ function finishStory(){
   S.wallet+=earned;
   S.levels[id]={stars:rate.map((r,i)=>r||!!prev.stars[i]),time:newBest?time:prev.time,score:Math.max(prev.score||0,G.score),fish:prev.fish||fishNew};
   if(def.boss==='king'&&!S.king){S.king=true;S.owned.push('color:shadow','hat:crown');pendingEnding=true}
-  const fishAll=K.LEVELS.filter(l=>!l.boss).every(l=>S.levels[l.id]&&S.levels[l.id].fish);
+  const fishAll=K.FISH_LEVELS.every(l=>S.levels[l.id]&&S.levels[l.id].fish);
   if(fishAll&&!S.owned.includes('color:gold')){S.owned.push('color:gold');UI.toast('Открыт золотой окрас!')}
   persist();
   const nx=K.LEVELS[def.index+1];
   A.play('win');
-  UI.results({id,title:def.boss?(def.boss==='king'?'Король повержен!':'Генерал повержен!'):`${def.name}: пройдено`,rate,boss:!!def.boss,par:L.par,time,score:G.score,combo:G.comboBest,earned,got:G.starsGot,all:G.starsTotal,newBest:newBest&&!firstClear,fishNew,friend,next:nx&&cur.mode==='story'?nx.id:null});
+  UI.results({hasFriend:!!def.friend,id,title:def.boss?(def.boss==='king'?'Король повержен!':'Генерал повержен!'):`${def.name}: пройдено`,rate,boss:!!def.boss,par:L.par,time,score:G.score,combo:G.comboBest,earned,got:G.starsGot,all:G.starsTotal,newBest:newBest&&!firstClear,fishNew,friend,next:nx&&cur.mode==='story'?nx.id:null});
 }
 function finishRun(won){
   const time=G.time/60,mode=cur.mode;let best,newBest=false,earned;

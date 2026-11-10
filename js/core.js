@@ -41,7 +41,8 @@ K.startLevel=function(L,opts){
   // вещи для спасения
   G.items=(L.items||[]).map(i=>({...i,got:false}));
   G.need=Object.assign({},(L.def&&L.def.need)||{});G.have={key:0,rope:0,cutter:0};
-  if(!G.cage)G.need={};
+  if(!G.cage&&!(L.def&&L.def.need&&!L.def.boss&&!opts.skipCage))G.need={};
+  G.tips=(L.tips||[]).map(t=>({...t,shown:false}));G.doorMsgT=-999;
   // ловушки
   const tier=opts.trapTier??-1;G.trapDef=tier>=0?K.TRAPS[Math.min(K.TRAPS.length-1,tier)]:null;
   G.trapTier=tier;G.trapsLeft=G.trapDef?G.trapDef.charges:0;G.traps=[];G.trapCd=0;
@@ -399,7 +400,11 @@ K.step=function(){
     G.state='rescue';return;
   }
   // дверь
-  if(G.goal&&overlap(P,G.goal)&&!(G.cage&&!G.cage.open)){G.state='won';emit('win');return}
+  for(const t of G.tips)if(!t.shown&&cx>=t.x){t.shown=true;emit('tip',{title:t.title,text:t.text})}
+  if(G.goal&&overlap(P,G.goal)&&!(G.cage&&!G.cage.open)){
+    if(!G.cage&&!K.cageReady()){if(G.frame-G.doorMsgT>150){G.doorMsgT=G.frame;emit('doorLocked',{missing:K.cageMissing()})}}
+    else{G.state='won';emit('win');return}
+  }
 };
 function nearHazard(){
   const P=G.P,tx=Math.floor((P.x+6)/T),ty=Math.floor((P.y+P.h+1)/T);
@@ -422,8 +427,9 @@ function updateChaser(C,P){
   const tr=C.trail,last=tr[tr.length-1];
   if(Math.abs(P.x-last[0])+Math.abs(P.y-last[1])>.8)tr.push([P.x,P.y]);
   if(!C.on){
-    if(!C.wake&&G.frame>=48){C.wake=true;emit('chaserWake',{x:C.kennel.x+6,y:C.kennel.y})}
-    if(G.frame>=138){C.on=true;C.idx=0;C.stun=30;emit('chaserStart',{name:K.CHASERS[C.look].name,x:C.kennel.x+6,y:C.kennel.y})}else return}
+    const trig=G.L.dogAt!==undefined?P.x>=G.L.dogAt:G.frame>=48;
+    if(!C.wake&&trig){C.wake=true;C.wakeF=G.frame;emit('chaserWake',{x:C.kennel.x+6,y:C.kennel.y})}
+    if(C.wake&&G.frame>=C.wakeF+90){C.on=true;C.idx=0;C.stun=30;emit('chaserStart',{name:K.CHASERS[C.look].name,x:C.kennel.x+6,y:C.kennel.y})}else return}
   if(C.stun>0){C.stun--;if(C.stun===0)emit('chaserFree',{x:C.x,y:C.y})}
   else{
     let sp=C.speed;

@@ -39,7 +39,7 @@ U.hub=function(t){
   if(t)tab=t;
   if(tab==='map'){U.worldMap();return}
   const S=K.app.save;
-  const fishGot=Object.values(S.levels).reduce((a,l)=>a+(l.fish?1:0),0),fishAll=K.LEVELS.filter(l=>!l.boss).length;
+  const fishGot=Object.values(S.levels).reduce((a,l)=>a+(l.fish?1:0),0),fishAll=K.FISH_LEVELS.length;
   const tabs=[['map','Карта'],['shop','Лавка'],['friends','Друзья'],['ch','Испытания'],['set','Настройки']];
   show(`<div class="hubui safe">
     <div class="hubtop"><h1>Кот на <span>крышах</span></h1>
@@ -155,71 +155,83 @@ U.setTab=t=>{tab=t;U.hub()};
 U.setShop=(c,s)=>{if(c)shopCat=c;shopSel=s;U.hub()};
 U.shopState=()=>({cat:shopCat,sel:shopSel});
 
-/* ---------- карта мира: дорога через город к берлоге ---------- */
-const MAPW=2600,MAPH=640;let mapProgress=0;
+/* ---------- карта мира: вертикальный путь вниз — от крыш через фабрики в берлогу ---------- */
+const MAPW=900,STEP=190,TOPPAD=260;
+const MAPH=TOPPAD+(K.LEVELS.length-1)*STEP+220;
+const NODES=K.LEVELS.map((l,i)=>[Math.round(450+Math.sin(i*1.05+.4)*250),TOPPAD+i*STEP]);
+let mapProgress=0;
+const zoneY=w=>{const idx=K.LEVELS.map((l,i)=>[l,i]).filter(([l])=>l.world===w).map(([,i])=>i);return [NODES[idx[0]][1]-150,NODES[idx[idx.length-1]][1]+95]};
 function roadPath(upto){
-  const P=NODES.slice(0,upto+1);if(P.length<2)return `M${P[0][0]} ${P[0][1]}`;
-  let d=`M${P[0][0]} ${P[0][1]}`;
+  const P=NODES.slice(0,upto+1);let d=`M${P[0][0]} ${P[0][1]}`;
   for(let i=0;i<P.length-1;i++){const p0=P[Math.max(0,i-1)],p1=P[i],p2=P[i+1],p3=P[Math.min(P.length-1,i+2)];
     const c1=[p1[0]+(p2[0]-p0[0])/6,p1[1]+(p2[1]-p0[1])/6],c2=[p2[0]-(p3[0]-p1[0])/6,p2[1]-(p3[1]-p1[1])/6];
     d+=` C${c1[0].toFixed(1)} ${c1[1].toFixed(1)} ${c2[0].toFixed(1)} ${c2[1].toFixed(1)} ${p2[0]} ${p2[1]}`}
   return d;
 }
-const NODES=[[150,470],[340,330],[560,450],[790,300],[1010,420],[1210,270],[1420,400],[1640,250],[1860,380],[2070,470],[2280,330],[2470,230]];
 function mapArt(){
-  let a=`<defs>
-    <linearGradient id="z1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0d0a26"/><stop offset="1" stop-color="#3b2868"/></linearGradient>
-    <linearGradient id="z2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#05141a"/><stop offset="1" stop-color="#1f4a48"/></linearGradient>
-    <linearGradient id="z3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#030108"/><stop offset="1" stop-color="#1e0c30"/></linearGradient>
-    <linearGradient id="fadeA" x1="0" x2="1"><stop offset="0" stop-color="#3b2868" stop-opacity="0"/><stop offset="1" stop-color="#1f4a48"/></linearGradient>
-    <filter id="soft"><feGaussianBlur stdDeviation="6"/></filter>
-    <radialGradient id="moon"><stop offset="0" stop-color="#fff3c4"/><stop offset=".6" stop-color="#fff3c4" stop-opacity=".25"/><stop offset="1" stop-color="#fff3c4" stop-opacity="0"/></radialGradient>
-  </defs>
-  <rect x="0" y="0" width="900" height="${MAPH}" fill="url(#z1)"/><rect x="900" y="0" width="900" height="${MAPH}" fill="url(#z2)"/><rect x="1800" y="0" width="800" height="${MAPH}" fill="url(#z3)"/>
-  <rect x="780" y="0" width="240" height="${MAPH}" fill="url(#fadeA)" opacity=".55"/>
-  <circle cx="230" cy="110" r="110" fill="url(#moon)"/><circle cx="230" cy="110" r="44" fill="#fff3c4"/><circle cx="250" cy="96" r="38" fill="#0d0a26"/>`;
+  const [a1,b1]=zoneY(0),[a2,b2]=zoneY(1),[a3,b3]=zoneY(2),H=MAPH;
+  const f=y=>(y/H).toFixed(4);
   let r=7;const R=()=>(r=r*16807%2147483647)/2147483647;
-  for(let i=0;i<120;i++){const x=R()*1800,y=R()*260;a+=`<circle cx="${x|0}" cy="${y|0}" r="${R()<.2?2:1}" fill="#fff" opacity="${.4+R()*.6}"/>`}
-  // крыши старого города
-  for(let x=-10;x<900;){const w=50+R()*90,h=120+R()*170,y=MAPH-h;a+=`<rect x="${x|0}" y="${y|0}" width="${w|0}" height="${h|0}" fill="${R()<.5?'#2b2260':'#231b55'}"/><rect x="${x|0}" y="${y|0}" width="${w|0}" height="6" fill="#8f80e0" opacity=".8"/>`;
-    for(let wy=y+18;wy<MAPH-14;wy+=22)for(let wx=x+10;wx<x+w-12;wx+=18)if(R()<.3)a+=`<rect x="${wx|0}" y="${wy|0}" width="7" height="9" fill="#ffcf6b" opacity=".8"/>`;
-    if(R()<.4)a+=`<rect x="${(x+w*.6)|0}" y="${(y-26)|0}" width="12" height="26" fill="#2b2260"/>`;x+=w+4}
-  // фабрики: трубы и дым
-  for(let x=900;x<1800;){const w=70+R()*110,h=110+R()*150,y=MAPH-h;a+=`<rect x="${x|0}" y="${y|0}" width="${w|0}" height="${h|0}" fill="${R()<.5?'#163838':'#1d4444'}"/><path d="M${x|0} ${y|0} l${(w/4)|0} -24 l0 24 l${(w/4)|0} -24 l0 24 l${(w/4)|0} -24 l0 24" fill="#1d4444"/>`;
-    const cx=x+w*.7,ch=90+R()*80;a+=`<rect x="${cx|0}" y="${(y-ch)|0}" width="16" height="${ch|0}" fill="#2a5a58"/><rect x="${(cx-2)|0}" y="${(y-ch)|0}" width="20" height="8" fill="#e85a3a" opacity=".7"/>`;
-    for(let k=0;k<3;k++)a+=`<circle cx="${(cx+8+k*14)|0}" cy="${(y-ch-14-k*20)|0}" r="${10+k*6}" fill="#9ad8d0" opacity="${.18-k*.04}"/>`;
-    for(let wy=y+16;wy<MAPH-14;wy+=24)for(let wx=x+10;wx<x+w-12;wx+=20)if(R()<.35)a+=`<rect x="${wx|0}" y="${wy|0}" width="8" height="8" fill="#8cffd2" opacity=".7"/>`;x+=w+10}
-  // берлога: вход-пасть, сталактиты, кристаллы
-  a+=`<path d="M1800 0 L2600 0 L2600 70 ${Array.from({length:16},(_,i)=>`L${1800+i*50+25} ${90+R()*90|0} L${1850+i*50} 70`).join(' ')} L1800 70Z" fill="#0b0614"/>`;
-  a+=`<path d="M1800 ${MAPH} L1800 520 Q1900 470 2000 540 Q2150 600 2300 500 Q2450 420 2600 520 L2600 ${MAPH}Z" fill="#14091f"/>`;
-  for(let i=0;i<22;i++){const x=1820+R()*760,y=180+R()*400,s=8+R()*20,c=R()<.5?'#9a6aff':'#5affd0';a+=`<path d="M${x|0} ${(y-s*1.8)|0} L${(x+s*.6)|0} ${y|0} L${x|0} ${(y+s*.5)|0} L${(x-s*.6)|0} ${y|0}Z" fill="${c}" opacity=".75"/><circle cx="${x|0}" cy="${y|0}" r="${(s*1.6)|0}" fill="${c}" opacity=".08"/>`}
-  a+=`<ellipse cx="2470" cy="270" rx="120" ry="150" fill="#000" opacity=".55"/><text x="2470" y="120" text-anchor="middle" font-size="22" fill="#d88aff" font-family="Rubik Mono One, sans-serif">ЛОГОВО</text>`;
-  // дорога: плавная кривая через все уровни
+  let a=`<defs>
+   <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#07051a"/><stop offset="${f(a1+200)}" stop-color="#1a1346"/><stop offset="${f(b1-120)}" stop-color="#3b2868"/>
+    <stop offset="${f(b1+60)}" stop-color="#245a62"/><stop offset="${f(a2+260)}" stop-color="#174444"/><stop offset="${f(b2-100)}" stop-color="#0f3030"/>
+    <stop offset="${f(b2+70)}" stop-color="#1e0f34"/><stop offset="${f(a3+300)}" stop-color="#120822"/><stop offset="1" stop-color="#040208"/>
+   </linearGradient>
+   <radialGradient id="moon"><stop offset="0" stop-color="#fff3c4"/><stop offset=".5" stop-color="#fff3c4" stop-opacity=".2"/><stop offset="1" stop-color="#fff3c4" stop-opacity="0"/></radialGradient>
+   <radialGradient id="glowP"><stop offset="0" stop-color="#9a6aff" stop-opacity=".45"/><stop offset="1" stop-color="#9a6aff" stop-opacity="0"/></radialGradient>
+   <radialGradient id="glowG"><stop offset="0" stop-color="#5affd0" stop-opacity=".35"/><stop offset="1" stop-color="#5affd0" stop-opacity="0"/></radialGradient>
+   <linearGradient id="mist" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cfe8ff" stop-opacity="0"/><stop offset=".5" stop-color="#cfe8ff" stop-opacity=".10"/><stop offset="1" stop-color="#cfe8ff" stop-opacity="0"/></linearGradient>
+   <filter id="soft"><feGaussianBlur stdDeviation="8"/></filter>
+  </defs>
+  <rect width="${MAPW}" height="${H}" fill="url(#sky)"/>`;
+  // звёзды гаснут к низу города
+  for(let i=0;i<160;i++){const y=R()*(b1+80),x=R()*MAPW;a+=`<circle cx="${x|0}" cy="${y|0}" r="${R()<.15?2:1}" fill="#fff" opacity="${((1-y/(b1+120))*.9).toFixed(2)}"/>`}
+  a+=`<circle cx="720" cy="140" r="150" fill="url(#moon)"/><circle cx="720" cy="140" r="56" fill="#fff3c4"/><circle cx="745" cy="122" r="48" fill="#0b0820"/>`;
+  // силуэты зданий по краям: город → фабрики
+  const side=(y0,y1,col,lit,kind)=>{for(const left of [true,false]){let y=y0;while(y<y1){const h=60+R()*90,w=90+R()*150,x=left?-10:MAPW-w+10;
+      a+=`<rect x="${x|0}" y="${y|0}" width="${w|0}" height="${(h+6)|0}" fill="${col}" opacity=".9"/><rect x="${x|0}" y="${y|0}" width="${w|0}" height="5" fill="${lit}" opacity=".55"/>`;
+      for(let wy=y+16;wy<y+h-8;wy+=18)for(let wx=x+12;wx<x+w-12;wx+=16)if(R()<.28)a+=`<rect x="${wx|0}" y="${wy|0}" width="6" height="8" fill="${kind==='f'?'#8cffd2':'#ffcf6b'}" opacity=".75"/>`;
+      if(kind==='f'&&R()<.6){const cx=left?x+w-40:x+24,ch=50+R()*60;a+=`<rect x="${cx|0}" y="${(y-ch)|0}" width="14" height="${ch|0}" fill="${col}"/><rect x="${(cx-2)|0}" y="${(y-ch)|0}" width="18" height="6" fill="#e85a3a" opacity=".7"/>`;for(let k=0;k<3;k++)a+=`<circle cx="${(cx+7+(left?12:-12)*k)|0}" cy="${(y-ch-14-k*18)|0}" r="${9+k*6}" fill="#bfe8e0" opacity="${(.16-k*.04).toFixed(2)}"/>`}
+      if(kind==='c'&&R()<.5)a+=`<rect x="${(left?x+w-30:x+14)|0}" y="${(y-24)|0}" width="12" height="24" fill="${col}"/>`;
+      y+=h*.75+R()*30}}};
+  side(a1+120,b1+40,'#231b55','#8f80e0','c');side(a2-20,b2+30,'#163838','#6fd6c0','f');
+  // переходы: туман между зонами
+  [b1+10,b2+20].forEach(y=>a+=`<rect x="0" y="${y-110}" width="${MAPW}" height="220" fill="url(#mist)"/>`);
+  // берлога: каменный свод, сталактиты, кристаллы, грибы
+  a+=`<path d="M0 ${a3} ${Array.from({length:19},(_,i)=>`L${i*50+25} ${a3+40+R()*90|0} L${i*50+50} ${a3+20}`).join(' ')} L${MAPW} ${a3-60} L${MAPW} ${a3-140} Q450 ${a3-30} 0 ${a3-140}Z" fill="#0c0616"/>`;
+  for(const left of [true,false]){let y=a3+80;while(y<H){const w=60+R()*120,h=80+R()*120,x=left?-10:MAPW-w+10;a+=`<path d="M${x} ${y+h} Q${x+w/2} ${y-h*.2} ${x+w} ${y+h}Z" fill="#170c26"/>`;y+=h*.7}}
+  for(let i=0;i<40;i++){const left=R()<.5,x=left?20+R()*170:MAPW-190+R()*170,y=a3+120+R()*(H-a3-160),sz=8+R()*18,c=R()<.5?'#9a6aff':'#5affd0';
+    a+=`<circle cx="${x|0}" cy="${y|0}" r="${sz*3|0}" fill="url(#${c==='#9a6aff'?'glowP':'glowG'})"/><path d="M${x|0} ${(y-sz*1.9)|0} L${(x+sz*.6)|0} ${y|0} L${x|0} ${(y+sz*.5)|0} L${(x-sz*.6)|0} ${y|0}Z" fill="${c}" opacity=".85"/>`}
+  for(let i=0;i<14;i++){const x=40+R()*820,y=a3+160+R()*(H-a3-200);if(x>220&&x<680)continue;a+=`<rect x="${x|0}" y="${y|0}" width="4" height="14" fill="#d8d0c0"/><ellipse cx="${(x+2)|0}" cy="${y|0}" rx="10" ry="6" fill="#5affd0" opacity=".85"/>`}
+  // логово Короля внизу
+  const ky=NODES[NODES.length-1][1];a+=`<ellipse cx="450" cy="${ky+30}" rx="250" ry="130" fill="#000" opacity=".55" filter="url(#soft)"/>`;
+  // дорога
   const d=roadPath(NODES.length-1),dp=roadPath(Math.max(0,mapProgress));
-  a+=`<path d="${d}" fill="none" stroke="#000" stroke-opacity=".45" stroke-width="44" stroke-linecap="round" transform="translate(0,8)"/>
-    <path d="${d}" fill="none" stroke="#3a2f60" stroke-width="38" stroke-linecap="round"/>
-    <path d="${d}" fill="none" stroke="#5a4c8a" stroke-width="28" stroke-linecap="round"/>
-    <path d="${d}" fill="none" stroke="#cfc4ff" stroke-opacity=".35" stroke-width="4" stroke-dasharray="14 18" stroke-linecap="round"/>
-    <path d="${dp}" fill="none" stroke="#ffd85a" stroke-opacity=".22" stroke-width="46" stroke-linecap="round" filter="url(#soft)"/>
+  a+=`<path d="${d}" fill="none" stroke="#000" stroke-opacity=".45" stroke-width="46" stroke-linecap="round" transform="translate(0,9)"/>
+    <path d="${d}" fill="none" stroke="#2c2350" stroke-width="40" stroke-linecap="round"/>
+    <path d="${d}" fill="none" stroke="#4d4180" stroke-width="30" stroke-linecap="round"/>
+    <path d="${d}" fill="none" stroke="#d8ceff" stroke-opacity=".35" stroke-width="4" stroke-dasharray="14 18" stroke-linecap="round"/>
+    <path d="${dp}" fill="none" stroke="#ffd85a" stroke-opacity=".25" stroke-width="48" stroke-linecap="round" filter="url(#soft)"/>
     <path d="${dp}" fill="none" stroke="#ffd85a" stroke-width="8" stroke-linecap="round" stroke-dasharray="1 20" class="flow"/>
     <path id="road" d="${d}" fill="none" stroke="none"/>`;
-  [['СТАРЫЕ КРЫШИ',450],['ФАБРИЧНЫЕ ТРУБЫ',1350],['БЕРЛОГА КОРОЛЯ',2150]].forEach(([t,x])=>a+=`<text x="${x}" y="${MAPH-24}" text-anchor="middle" font-size="26" fill="#ffd85a" opacity=".85" font-family="Rubik Mono One, sans-serif">${t}</text>`);
   return a;
 }
 U.worldMap=function(){
   const S=K.app.save;
-  const fishGot=Object.values(S.levels).reduce((a,l)=>a+(l.fish?1:0),0),fishAll=K.LEVELS.filter(l=>!l.boss).length;
+  const fishGot=Object.values(S.levels).reduce((a,l)=>a+(l.fish?1:0),0),fishAll=K.FISH_LEVELS.length;
   let cur=K.LEVELS.findIndex(l=>K.app.unlocked(l.id)&&!S.levels[l.id]);if(cur<0)cur=K.LEVELS.length-1;
   mapProgress=cur;const from=Math.min(cur,S.mapPos??cur);
   const nodes=K.LEVELS.map((l,i)=>{
     const [x,y]=NODES[i],st=S.levels[l.id],open=K.app.unlocked(l.id),fr=l.friend&&K.FRIEND[l.friend],saved=fr&&S.friends.includes(fr.id);
-    const cls=['mnode',l.boss?'boss':'',st?'done':'',i===cur?'next':'',open?'':'lock'].join(' ');
-    const label=l.boss?(l.boss==='king'?pic('king',0,46):pic('general',0,46)):l.id;
+    const cls=['mnode',l.boss?'boss':'',l.tutorial?'tut':'',st?'done':'',i===cur?'next':'',open?'':'lock',x>450?'r':'l'].join(' ');
+    const label=l.boss?(l.boss==='king'?pic('king',0,50):pic('general',0,50)):l.tutorial?'?':l.id;
     const friend=fr?`<span class="mf ${saved?'saved':open?'caged':'unknown'}" title="${esc(open||saved?fr.name:'???')}">${pic(open||saved?'friend':'cage',fr.id,40,open||saved?'':'sil')}${saved?'':LOCK}</span>`:'';
-    const need=l.need&&open&&!saved?`<span class="mneed">${Object.entries(l.need).map(([k,n])=>`${itemPic(k,18)}<b>${n}</b>`).join('')}</span>`:'';
+    const need=l.need&&open&&!saved&&!st?`<span class="mneed">${Object.entries(l.need).map(([k,n])=>`${itemPic(k,18)}<b>${n}</b>`).join('')}</span>`:'';
     return `<button class="${cls}" style="left:${x/MAPW*100}%;top:${y/MAPH*100}%" ${open?`data-act="level" data-id="${l.id}"`:'disabled'} aria-label="${esc(l.name)}">
-      ${friend}<span class="o">${open?label:LOCK}</span><span class="st">${open?stars3(st&&st.stars):''}</span><span class="nm">${esc(l.name)}</span>${need}</button>`;
+      <span class="o">${open?label:LOCK}</span><span class="info"><span class="nm">${esc(l.name)}</span><span class="st">${open?stars3(st&&st.stars):''}</span>${need}</span>${friend}</button>`;
   }).join('');
+  const zones=K.WORLDS.map((w,wi)=>{const [y0]=zoneY(wi);return `<div class="zone" style="top:${(y0+20)/MAPH*100}%"><span class="zn">Этап ${wi+1}</span><b>${esc(w.name)}</b><span class="zs">${esc(w.sub)}</span></div>`}).join('');
   const [cx,cy]=NODES[cur];
   show(`<div class="mapui">
     <div class="maptop safe"><button class="btn sm ghost" data-act="tab" data-tab="shop">Дом и лавка</button>
@@ -227,27 +239,24 @@ U.worldMap=function(){
       <div class="row"><span class="chip"><span class="s">★</span><b>${S.wallet}</b></span><span class="chip" title="Золотые рыбки">${pic('fish',0,20)} <b>${fishGot}/${fishAll}</b></span><span class="chip fr" title="Спасённые друзья">${S.friends.length?S.friends.map(id=>pic('friend',id,26)).join(''):'друзей пока нет'}</span></div></div>
     <div class="mapscroll" id="mapscroll"><div class="mapc">
       <svg viewBox="0 0 ${MAPW} ${MAPH}" preserveAspectRatio="none" aria-hidden="true">${mapArt()}</svg>
-      ${nodes}
+      ${zones}${nodes}
       <span class="mcat" id="mcat" style="left:${cx/MAPW*100}%;top:${cy/MAPH*100}%">${pic('cat',S.skin,64)}</span>
-      <span class="mdog" id="mdog" style="left:${Math.max(2,cx-90)/MAPW*100}%;top:${(cy+30)/MAPH*100}%">${pic('dog',K.LEVELS[cur].world,52)}</span>
+      <span class="mdog" id="mdog" style="left:${cx/MAPW*100}%;top:${(cy-100)/MAPH*100}%">${pic('dog',K.LEVELS[cur].world,52)}</span>
     </div></div>
-    <p class="maphint">Нажмите на уровень, чтобы начать. В клетках ждут друзья — для каждой клетки нужны ключи, верёвки и кусачки, спрятанные на уровне.</p>
   </div>`,'');
-  const sc=$('mapscroll');
-  const c=sc.firstElementChild;const center=x=>Math.max(0,x/MAPW*c.offsetWidth-sc.clientWidth/2);
-  sc.scrollLeft=center(NODES[from][0]);
-  // кот идёт по дороге к новому уровню
+  const sc=$('mapscroll'),c=sc.firstElementChild;c.style.aspectRatio=`${MAPW}/${MAPH}`;const center=y=>Math.max(0,y/MAPH*c.offsetHeight-sc.clientHeight/2);
+  sc.scrollTop=center(NODES[from][1]);
+  const road=$('road'),len=road.getTotalLength();
+  const at=i=>{let lo=0,hi=len;for(let k=0;k<24;k++){const m=(lo+hi)/2;if(road.getPointAtLength(m).y<NODES[i][1])lo=m;else hi=m}return lo};
+  const cat=$('mcat'),dog=$('mdog');
+  const put=(el,l,dy)=>{const p=road.getPointAtLength(Math.max(0,Math.min(len,l)));el.style.left=p.x/MAPW*100+'%';el.style.top=(p.y+dy)/MAPH*100+'%'};
   if(from<cur){
-    const road=$('road'),len=road.getTotalLength();const at=i=>{let lo=0,hi=len;for(let k=0;k<22;k++){const m=(lo+hi)/2,p=road.getPointAtLength(m);if(p.x<NODES[i][0])lo=m;else hi=m}return lo};
-    const l0=at(from),l1=at(cur),cat=$('mcat'),dog=$('mdog'),t0=performance.now(),dur=900+(cur-from)*500;
-    const put=(el,l,dy)=>{const p=road.getPointAtLength(Math.max(0,l));el.style.left=p.x/MAPW*100+'%';el.style.top=(p.y+dy)/MAPH*100+'%'};
-    put(cat,l0,0);put(dog,l0-140,30);
-    const step=now=>{if(!cat.isConnected)return;const k=Math.min(1,(now-t0-300)/dur),e=k<0?0:k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;const l=l0+(l1-l0)*e;put(cat,l,0);put(dog,l-140,30);
-      sc.scrollLeft=center(road.getPointAtLength(l).x);if(k<1)requestAnimationFrame(step);else{S.mapPos=cur;K.app.persist();K.audio.sfxPlay('checkpoint')}};
+    const l0=at(from),l1=at(cur),t0=performance.now(),dur=1000+(cur-from)*600;put(cat,l0,0);put(dog,l0-160,0);
+    const step=now=>{if(!cat.isConnected)return;const k=Math.min(1,(now-t0-350)/dur),e=k<0?0:k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;const l=l0+(l1-l0)*e;put(cat,l,0);put(dog,l-160,0);
+      sc.scrollTop=center(road.getPointAtLength(l).y);if(k<1)requestAnimationFrame(step);else{S.mapPos=cur;K.app.persist();K.audio.sfxPlay('checkpoint')}};
     requestAnimationFrame(step);
-  }else{S.mapPos=cur;K.app.persist()}
+  }else{put(dog,at(cur)-160,0);S.mapPos=cur;K.app.persist()}
 };
-
 /* ---------- карточка уровня ---------- */
 U.levelIntro=function(id){
   const l=K.LEVEL[id],S=K.app.save,st=S.levels[id];
@@ -258,11 +267,11 @@ U.levelIntro=function(id){
     <h2>${esc(l.name)}</h2>
     <p>${esc(l.news)}</p>
     ${fr?`<p class="sub">${rescued?`${esc(fr.name)} уже дома`:`В клетке ждёт: <b>${esc(fr.name)}</b> → ${esc(fr.abilName)}`}</p>`:''}
-    ${l.need&&!rescued?`<div class="needs">${Object.entries(l.need).map(([k,n])=>`<span>${itemPic(k,26)} ${esc(K.ITEMS[k].name)} ×${n}</span>`).join('')}</div><p class="sub">Вещи спрятаны на уровне — без них клетку не открыть.</p>`:''}
-    ${l.boss?'':(()=>{const story=K.LEVELS.filter(x=>!x.boss),ti=story.indexOf(l),tr=K.TRAPS[ti];return `<div class="introw">${pic('dog',l.world,56)}<p class="sub">За вами бежит <b>${esc(K.CHASERS[l.world].name)}</b>.</p>${pic('trap',ti,44)}<p class="sub">Ловушка: <b>${esc(tr.name)}</b> ×${tr.charges}<br>${esc(tr.desc)}</p></div>`})()}
+    ${l.need&&!rescued&&!l.boss?`<div class="needs">${Object.entries(l.need).map(([k,n])=>`<span>${itemPic(k,26)} ${esc(K.ITEMS[k].name)} ×${n}</span>`).join('')}</div><p class="sub">Вещи спрятаны на уровне — без них ${fr?'клетку':'дверь'} не открыть.</p>`:''}
+    ${l.boss?'':(()=>{const ti=K.trapTierOf(l),tr=K.TRAPS[ti];return `<div class="introw">${pic('dog',l.world,56)}<p class="sub">За вами бежит <b>${esc(K.CHASERS[l.world].name)}</b>.</p>${pic('trap',ti,44)}<p class="sub">Ловушка: <b>${esc(tr.name)}</b> ×${tr.charges}<br>${esc(tr.desc)}</p></div>`})()}
     ${st?`<div class="goals" style="width:100%"><div class="kv"><span>Оценка</span><b style="color:var(--star)">${stars3(st.stars)}</b></div>
       <div class="kv"><span>Лучшее время</span><b>${st.time?fmtT(st.time):'—'}</b></div><div class="kv"><span>Норматив</span><b>${fmtT(K.app.parOf(id))}</b></div>
-      ${l.boss?'':`<div class="kv"><span>Золотая рыбка</span><b>${st.fish?'найдена '+pic('fish',0,18):(()=>{const f=K.buildLevel(l).fish[0];const g=f&&K.ABIL_FRIEND[f.gate];return g&&!K.app.save.friends.includes(g.id)?`нужно умение «${esc(g.abilName)}» `+pic('friend',g.id,22):'ищите…'})()}</b></div>`}</div>`:''}
+      ${l.boss||l.tutorial?'':`<div class="kv"><span>Золотая рыбка</span><b>${st.fish?'найдена '+pic('fish',0,18):(()=>{const f=K.buildLevel(l).fish[0];const g=f&&K.ABIL_FRIEND[f.gate];return g&&!K.app.save.friends.includes(g.id)?`нужно умение «${esc(g.abilName)}» `+pic('friend',g.id,22):'ищите…'})()}</b></div>`}</div>`:''}
     <div class="row"><button class="btn" data-act="play" data-id="${id}" autofocus>Играть</button>
     ${st?`<button class="btn ghost" data-act="time" data-id="${id}">На время${S.ghosts[id]?' (с призраком)':''}</button>`:''}
     <button class="btn ghost" data-act="tab" data-tab="map">Назад</button></div></div>`);
@@ -297,7 +306,7 @@ U.results=function(r){
   if(r.newBest)extra.push('Новый рекорд времени!');
   if(r.fishNew)extra.push('Найдена золотая рыбка! +★ 50');
   if(r.friend)extra.push(`${K.FRIEND[r.friend].name} теперь живёт у вас дома`);
-  const goals=r.boss?[['Победа',true],['Без урона',r.rate[1]],[`Быстрее ${fmtT(r.par)}`,r.rate[2]]]:[['Друг спасён и дверь найдена',true],[`Все звёзды (${r.got}/${r.all})`,r.rate[1]],[`Быстрее ${fmtT(r.par)}`,r.rate[2]]];
+  const goals=r.boss?[['Победа',true],['Без урона',r.rate[1]],[`Быстрее ${fmtT(r.par)}`,r.rate[2]]]:[[r.hasFriend?'Друг спасён и дверь найдена':'Уровень пройден',true],[`Все звёзды (${r.got}/${r.all})`,r.rate[1]],[`Быстрее ${fmtT(r.par)}`,r.rate[2]]];
   show(`<div class="card"><h2>${esc(r.title)}</h2>
     <div class="rate" id="rate">${[0,1,2].map(()=>'<span>★</span>').join('')}</div>
     <div class="goals">${goals.map(([t,y])=>`<span class="${y?'y':'n'}">${y?'★':'☆'} ${esc(t)}</span>`).join('')}</div>
@@ -338,7 +347,8 @@ U.confirm=function(text,yes){
 
 /* ---------- HUD ---------- */
 let lastHud='';
-U.hudShow=function(on){$('hud').hidden=!on;if(!on&&U.clearFast)U.clearFast();$('pad').classList.toggle('show',on);if(!on){$('bossbar').hidden=true;$('hCombo').className='combo';$('banner').className='banner';$('fx').innerHTML=''}};
+let tipT;U.tip=function(h,t){const el=$('tip');el.innerHTML=`<b>${esc(h)}</b><span>${esc(t)}</span>`;el.classList.add('on');clearTimeout(tipT);tipT=setTimeout(()=>el.classList.remove('on'),7000)};
+U.hudShow=function(on){if(!on){clearTimeout(tipT);$('tip').classList.remove('on')}$('hud').hidden=!on;if(!on&&U.clearFast)U.clearFast();$('pad').classList.toggle('show',on);if(!on){$('bossbar').hidden=true;$('hCombo').className='combo';$('banner').className='banner';$('fx').innerHTML=''}};
 U.hud=function(){
   const G=K.G;if(!G.P)return;
   const lives=Math.max(0,G.lives),full=Math.max(G.maxLives,lives);
@@ -404,6 +414,8 @@ U.onEvent=function(e){
     case 'item':U.toast(`${K.ITEMS[e.type].name}: ${e.have}/${e.need}`,itemPic(e.type,26));if(K.cageReady())setTimeout(()=>U.banner('Всё собрано!','Бегите к клетке'),600);break;
     case 'bossTired':U.banner(e.king?'Король спустился!':'Генерал устал!',e.king?(e.armor?'Бейте его перекатом или лапой — сейчас!':'Прыгайте ему на голову — сейчас!'):'Прыгайте ему на голову — сейчас!');break;
     case 'bossNope':U.toast(e.king?'Король в воздухе — ждите, пока он спустится':'Рано! Ждите, пока над ним появится стрелка');break;
+    case 'tip':U.tip(e.title,e.text);break;
+    case 'doorLocked':U.banner('Дверь заперта','Не хватает: '+Object.entries(e.missing).map(([k,n])=>`${K.ITEMS[k].name.toLowerCase()} ×${n}`).join(', '));break;
     case 'kit':U.toast('+1 ловушка',itemPic('kit',26));break;
     case 'fishLocked':{const g=K.ABIL_FRIEND[e.gate];if(g)U.banner('Золотая рыбка под замком',`Нужно умение «${g.abilName}» (${g.name}). Вернитесь сюда, когда спасёте друга`);break}
     case 'hint':{const h={double:['Двойной прыжок!','Нажмите прыжок ещё раз прямо в воздухе'],wall:['Прыжок от стены!','Прыгните к стене и жмите прыжок, касаясь её'],paw:['Удар лапой!',matchMedia('(pointer:coarse)').matches?'Нажмите «ЛАПА» у треснувшей стены':'Нажмите X у треснувшей стены, чтобы её сломать'],glide:['Планируйте!','Удерживайте прыжок, пока падаете']}[e.k];if(h)U.banner(h[0],h[1]);break}

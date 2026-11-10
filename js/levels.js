@@ -225,28 +225,47 @@ const CH={
 /* ---------- кампания ---------- */
 const C=(name,...more)=>[name,...more];
 K.LEVELS=[
+  {id:'1-0',world:0,name:'Обучение',tutorial:true,need:{key:1},kits:0,seed:11,pool:['walker'],foe:0,news:'Научитесь бегать, прыгать, искать ключи и ставить ловушки'},
   {id:'1-1',world:0,name:'Первая ночь',friend:'crow',need:{key:1},kits:0,seed:101,pool:['walker'],foe:.45,news:'Пружины и тени',
    plan:['start','flat','hops','planks','check','spring','spikes','steps','check','hops','secret_double','spring','flat']},
-  {id:'1-2',world:0,name:'Черепичный квартал',friend:'owl',need:{key:2},kits:1,seed:202,pool:['walker','hopper'],foe:.55,news:'Падающая черепица и прыгающие тени',
+  {id:'1-2',world:0,name:'Крыши-качели',need:{key:2},kits:1,seed:151,pool:['walker','hopper'],foe:.5,news:'Двойной прыжок через пропасти',
+   plan:['start','hops','spring','dblGap','check','fallBridge','planks','steps','check','springTower','secret_glide','dblGap','hops']},
+  {id:'1-3',world:0,name:'Черепичный квартал',friend:'owl',need:{key:2},kits:1,seed:202,pool:['walker','hopper'],foe:.55,news:'Падающая черепица и прыгающие тени',
    plan:['start','hops','fallBridge','dblWall','check','flat','dblGap','planks','fallBridge','check','steps','secret_glide','dblWall','springTower','hops']},
-  {id:'1-3',world:0,name:'Ветреные антенны',friend:'squirrel',need:{key:2,rope:1},kits:1,seed:303,pool:['walker','hopper','walker'],foe:.6,news:'Ветер, летучие мыши и восходящие потоки',
+  {id:'1-4',world:0,name:'Голубиный двор',need:{key:2,rope:1},kits:1,seed:252,pool:['walker','hopper','walker'],foe:.55,news:'Планируйте над пропастями',
+   plan:['start','glideGap','planks','bats','check','updraft','spikes','hops','check','fallBridge','secret_dash','glideGap','flat']},
+  {id:'1-5',world:0,name:'Ветреные антенны',friend:'squirrel',need:{key:2,rope:1},kits:1,seed:303,pool:['walker','hopper','walker'],foe:.6,news:'Ветер, летучие мыши и восходящие потоки',
    plan:['start','wind','glideGap','bats','check','updraft','hops','wind','check','glideGap','secret_dash','bats','planks','updraft']},
   {id:'1-B',world:0,name:'Генерал теней',boss:'general1',news:'Босс! Прыгайте ему на голову, когда он устанет'},
   {id:'2-1',world:1,name:'Трубы и пар',friend:'raccoon',need:{key:2,rope:1},kits:1,seed:404,pool:['walker','shooter','hopper'],foe:.55,news:'Подвижные платформы, стрелки и броня',
    plan:['start','moverGap','shooters','dashGap','check','armor','dashArmor','elevator','check','moverGap','secret_wall','hops','spring','flat']},
-  {id:'2-2',world:1,name:'Колодец дворов',friend:'lizard',need:{key:3,rope:1},kits:1,seed:505,pool:['walker','shooter','hopper','armored'],foe:.6,news:'Треснувшие стены',
+  {id:'2-2',world:1,name:'Паровые котлы',need:{key:3,rope:1},kits:1,seed:454,pool:['walker','shooter','armored'],foe:.6,news:'Ломайте стены лапой',
+   plan:['start','moverGap','crackGate','shooters','check','elevator','dashArmor','fallBridge','check','crackGate','secret_wall','moverGap','hops']},
+  {id:'2-3',world:1,name:'Колодец дворов',friend:'lizard',need:{key:3,rope:1},kits:1,seed:505,pool:['walker','shooter','hopper','armored'],foe:.6,news:'Треснувшие стены',
    plan:['start','crackGate','moverGap','fallBridge','check','dashArmor','crackGate','bats','check','secret_light','elevator','shooters','glideGap','hops']},
-  {id:'2-3',world:1,name:'Неоновые вывески',friend:'firefly',need:{key:3,rope:1,cutter:1},kits:2,seed:606,pool:['hopper','shooter','armored','walker'],foe:.65,news:'Колодцы для прыжков от стен',
+  {id:'2-4',world:1,name:'Крыши-лабиринт',need:{key:3,rope:1,cutter:1},kits:2,seed:555,pool:['hopper','shooter','armored'],foe:.62,news:'Колодцы и прыжки от стен',
+   plan:['start','chimney','crackGate','armor','check','wind','chimney','shooters','check','dblWall','secret_light','elevator','hops']},
+  {id:'2-5',world:1,name:'Неоновые вывески',friend:'firefly',need:{key:3,rope:1,cutter:1},kits:2,seed:606,pool:['hopper','shooter','armored','walker'],foe:.65,news:'Колодцы для прыжков от стен',
    plan:['start','chimney','wind','shooters','check','chimney','fallBridge','armor','check','dblWall','secret_magnet','crackGate','moverGap','updraft']},
   {id:'2-B',world:1,name:'Генерал теней II',boss:'general2',news:'Генерал надел броню: сбейте её лапой или перекатом'},
   {id:'3-1',world:2,name:'Вход в берлогу',friend:'mouse',need:{key:3,rope:1,cutter:1},kits:2,seed:707,pool:['walker','hopper','bat'],foe:.6,news:'Тьма, сталактиты и призрачные мостки',
    plan:['start','cave_drips','ghostBridge','cave_dark','check','cave_slime','ghostStairs','bats','check','cave_drips','secret_magnet','ghostBridge','cave_dark','hops']},
-  {id:'3-2',world:2,name:'Кристальные пещеры',friend:'hedgehog',need:{key:3,rope:2,cutter:1},kits:2,seed:808,pool:['hopper','shooter','armored','walker'],foe:.7,news:'Огненные гейзеры и липкая слизь',
+  {id:'3-2',world:2,name:'Грибные гроты',need:{key:3,rope:2,cutter:1},kits:2,seed:757,pool:['walker','hopper','bat','shooter'],foe:.65,news:'Слизь, гейзеры и тьма',
+   plan:['start','cave_slime','ghostBridge','cave_drips','check','cave_geysers','bats','cave_dark','check','ghostStairs','secret_paw','cave_slime','hops']},
+  {id:'3-3',world:2,name:'Кристальные пещеры',friend:'hedgehog',need:{key:3,rope:2,cutter:1},kits:2,seed:808,pool:['hopper','shooter','armored','walker'],foe:.7,news:'Огненные гейзеры и липкая слизь',
    plan:['start','cave_geysers','cave_slime','updraft','check','shooters','cave_drips','glideGap','elevator','check','cave_geysers','secret_paw','cave_dark','ghostStairs','cave_slime']},
-  {id:'3-3',world:2,name:'Тронный зал',friend:'kitten',need:{key:4,rope:2,cutter:2},kits:2,seed:909,pool:['hopper','shooter','armored','walker'],foe:.75,news:'Последний путь: всё, чему вы научились',
+  {id:'3-4',world:2,name:'Мост над бездной',need:{key:4,rope:2,cutter:1},kits:2,seed:858,pool:['hopper','shooter','armored','bat'],foe:.72,news:'Призрачные мосты в темноте',
+   plan:['start','cave_dark','ghostBridge','glideGap','check','cave_geysers','dashGap','chimney','check','cave_drips','secret_light','ghostBridge','hops']},
+  {id:'3-5',world:2,name:'Тронный зал',friend:'kitten',need:{key:4,rope:2,cutter:2},kits:2,seed:909,pool:['hopper','shooter','armored','walker'],foe:.75,news:'Последний путь: всё, чему вы научились',
    plan:['start','chimney','cave_geysers','crackGate','check','cave_dark','dashArmor','updraft','check','cave_drips','shooters','chimney','check','cave_slime','glideGap','secret_light','cave_geysers','dblGap']},
-  {id:'3-B',world:2,name:'Король Теней',boss:'king',news:'Финал. Король неуязвим в броне, пока не спустится'}
+  {id:'3-B',world:2,name:'Король Теней',boss:'king',news:'Финал. Бейте Короля, когда он спустится на землю'}
 ];
+/* Порядковый номер обычного уровня: от него зависят ловушка и скорость пса */
+K.STORY_LEVELS=K.LEVELS.filter(l=>!l.boss&&!l.tutorial);
+K.trapTierOf=def=>{if(def.tutorial)return 0;const i=K.STORY_LEVELS.indexOf(def);return i<0?-1:Math.min(K.TRAPS.length-1,Math.floor(i*(K.TRAPS.length-1)/(K.STORY_LEVELS.length-1)))};
+K.FISH_LEVELS=K.STORY_LEVELS;
+/* Старые сохранения: уровни переименованы, когда добавились новые */
+K.LEVEL_MIGRATE={'1-3':'1-5','1-2':'1-3','2-3':'2-5','2-2':'2-3','3-3':'3-5','3-2':'3-3'};
 K.LEVEL=Object.fromEntries(K.LEVELS.map((l,i)=>[l.id,Object.assign(l,{index:i})]));
 
 function descend(b){if(b.top<6){b.gap(2);b.roof(b.ri(3,5),Math.min(11,b.top+b.ri(3,4)))}}
@@ -301,8 +320,29 @@ function arena(kind){
   return L;
 }
 
+function tutorial(def){
+  const b=Builder(def.seed,300);const L=b.L;L.tips=[];
+  const tip=(c,title,text)=>L.tips.push({x:c*T,title,text});
+  b.roof(14,11);tip(3,'Бег','← → или A D. На телефоне — кнопки внизу слева');b.starLine(6,4,9,2);
+  b.gap(2);tip(13,'Прыжок','Пробел, W или ↑. Перепрыгните яму! Держите прыжок дольше — прыжок выше');
+  b.roof(12,11);b.starArc(13,10,16,10,2);
+  b.foe('walker',b.x-4,11);tip(b.x-9,'Тень!','Прыгайте на тени сверху — они исчезнут. Сбоку они кусаются');
+  const x2=b.roof(14,11);b.plank(x2+3,8,4);b.starLine(x2+3,4,7);b.plank(x2+8,5,3);
+  tip(x2+1,'Звёзды и доски','Звёзды — деньги для лавки. На доски можно запрыгнуть снизу');
+  L.items.push({type:'key',x:(x2+9)*T+8,y:4*T+8});tip(x2+6,'Ключ наверху!','Без ключей клетку с другом не открыть. Заберитесь на верхнюю доску');
+  const x3=b.roof(10,11);b.check(x3+3,11);tip(x3+1,'Фонарь','Если сердечки кончатся, вы продолжите от последнего фонаря');
+  const x4=b.roof(16,11);b.spike(x4+5,11);b.spike(x4+6,11);b.starArc(x4+4,10,x4+7,10,2.5);tip(x4+1,'Шипы','Шипы отнимают сердце. Перепрыгните их');
+  tip(x4+10,'Пёс проснулся!','Он бежит по вашему следу. Нажмите C (кнопка «ЛОВУШКА»), чтобы поставить ловушку');L.dogAt=(x4+10)*T;
+  const x5=b.roof(8,11);b.spring(x5+5,11,10);tip(x5+1,'Пружина','Наступите на неё — она подбросит высоко');
+  b.gap(3);b.roof(8,8);b.starLine(b.x-6,4,6);
+  b.gap(2);const x6=b.roof(16,10);tip(x6+1,'Дверь','Соберите все вещи и войдите в светящуюся дверь. Удачи!');
+  L.goal={col:x6+11,top:10};b.starLine(x6+2,5,9,2);
+  L.w=b.x+1;L.par=60;L.tutorial=true;
+  return Object.assign(L,{def});
+}
 K.buildLevel=function(def){
   if(def.boss)return Object.assign(arena(def.boss),{def});
+  if(def.tutorial)return tutorial(def);
   const b=Builder(def.seed,900);b.pool=def.pool;b.foeRate=def.foe;
   for(const step of def.plan){descend(b);CH[step](b)}
   CH.finish(b,def.friend);
