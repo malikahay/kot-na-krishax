@@ -333,6 +333,7 @@ function buildBoss(king){
   const armor=new THREE.Mesh(new THREE.SphereGeometry(.5,20,12,0,Math.PI*2,0,Math.PI*.6),new THREE.MeshStandardMaterial({color:0xb0b8d8,metalness:.9,roughness:.2,transparent:true,opacity:.85}));
   armor.position.y=.02;body.add(armor);U.armor=armor;
   for(let i=0;i<4;i++){const sp=new THREE.Mesh(Geo.spikeS,M.steel);sp.scale.setScalar(1.4);const a=-0.9+i*.6;sp.position.set(Math.sin(a)*.42,Math.cos(a)*.42,0);sp.rotation.z=-a;armor.add(sp)}
+  const ar=new THREE.Group();const am=basic({color:0xffd85a});const ac=new THREE.Mesh(Geo.cone,am);ac.scale.set(.5,.6,.5);ac.rotation.x=Math.PI;ar.add(ac);const ab=new THREE.Mesh(Geo.unit,am);ab.scale.set(.18,.5,.18);ab.position.y=.5;ar.add(ab);const ag=new THREE.Sprite(glowMat(0xffd85a,.7));ag.scale.set(1.6,1.6,1);ar.add(ag);ar.scale.setScalar(2);g.add(ar);U.arrow=ar;
   U.dizzy=new THREE.Group();g.add(U.dizzy);for(let i=0;i<3;i++){const st=new THREE.Mesh(Geo.star,M.star);st.scale.setScalar(.45);U.dizzy.add(st)}
   return g;
 }
@@ -744,7 +745,8 @@ R.frame=function(dt,now){
     if(st==='dying'){const k=1-Math.min(1,B.t/110);sx=sy=.3+k*.7;o.rotation.z=Math.sin(t*30)*.2}
     U.body.scale.set((B.king?2.1:1.8)*sx,(B.king?2.1:1.8)*sy,(B.king?2.1:1.8));
     U.wisps.forEach((w,k)=>w.scale.y=.8+Math.sin(t*10+k*1.7)*.35);
-    U.dizzy.visible=st==='tired'||st==='dazed';U.dizzy.position.y=B.h/T*.55;U.dizzy.children.forEach((s,k)=>{const a=t*4+k*2.1;s.position.set(Math.cos(a)*.7,Math.sin(t*6+k)*.1,Math.sin(a)*.7);s.rotation.y=t*3});
+    U.dizzy.visible=st==='tired'||st==='dazed';
+    U.arrow.visible=(st==='tired'||st==='dazed')&&B.inv===0;U.arrow.position.y=B.h/T*.55+2.2+Math.abs(Math.sin(t*6))*.35;U.dizzy.position.y=B.h/T*.55;U.dizzy.children.forEach((s,k)=>{const a=t*4+k*2.1;s.position.set(Math.cos(a)*.7,Math.sin(t*6+k)*.1,Math.sin(a)*.7);s.rotation.y=t*3});
     if(U.hands)U.hands.forEach((h,k)=>{h.position.y=-.05+Math.sin(t*3+k*2)*.08});
     if(U.cape)U.cape.rotation.x=Math.sin(t*2)*.1-.1;
     if(Math.random()<.3)part(wx(B.x+Math.random()*B.w),wy(B.y+B.h*Math.random()),{col:B.king?0x8a2cff:0x5a2a9a,life:30,max:30,vy:.02,grav:0,big:true});

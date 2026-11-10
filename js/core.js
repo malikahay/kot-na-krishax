@@ -547,6 +547,7 @@ function updateBoss(B,P){
     return}
   if(B.dead)return;
   if(B.king)kingAI(B,P,W);else generalAI(B,P,W);
+  if(B.st!==B._ps){if(B.st==='tired'||B.st==='dazed')emit('bossTired',{king:B.king,armor:B.armor});B._ps=B.st}
   // контакт с котом
   if(overlap(P,B)&&B.st!=='intro'){
     const stomp=P.vy>0&&P.y+P.h-P.vy<=B.y+10;
@@ -554,7 +555,7 @@ function updateBoss(B,P){
     else if(stomp){
       if(bossVulnerable(B,'stomp')){hitBoss(B,'stomp');P.vy=-7.5;P.springT=20;P.airJumps=1;P.canDash=true}
       else if(B.armor){P.vy=-6;emit('clank',{x:cx,y:B.y});hurt('armor')}
-      else{P.vy=-6}
+      else{P.vy=-6;if(!B.nopeT||G.frame-B.nopeT>120){B.nopeT=G.frame;emit('bossNope',{king:B.king})}}
     }else if(B.inv<50&&B.st!=='dazed'&&B.st!=='tired')hurt('boss');
   }
 }
@@ -571,7 +572,7 @@ function generalAI(B,P,W){
       ground();if(B.onGround&&B.t>5){B.vx=0;B.st=B.fired++>=(rage?1:0)?'tired':'leap';B.t=0}break;
     case 'shoot':B.vx=0;ground();if(B.t%24===12&&B.fired<(rage?3:2)){bossShoot(B,P,g2?5:3,.32,1.9);B.fired++}if(B.t>90){B.st='tired';B.t=0}break;
     case 'summon':B.vx=0;ground();if(B.t===30){summon('hopper');summon(g2?'bat':'walker')}if(B.t>70){B.st='walk';B.t=0}break;
-    case 'tired':B.vx*=.8;ground();if(B.t>(rage?85:120)){B.st='walk';B.t=0}break;
+    case 'tired':B.vx*=.8;ground();if(B.t>(rage?110:160)){B.st='walk';B.t=0}break;
     case 'hurt':ground();B.vx*=.95;if(B.t>50){B.st='walk';B.t=0}break;
     case 'armor':B.vx=0;ground();if(B.t===20){B.armor=true;emit('armorOn',{x:B.x+B.w/2,y:B.y})}if(B.t>50){B.st='walk';B.t=0}break;
   }

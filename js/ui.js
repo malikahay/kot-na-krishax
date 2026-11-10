@@ -394,7 +394,7 @@ U.onEvent=function(e){
     case 'pop':U.pop(e);break;
     case 'hurt':case 'fall':U.flash();break;
     case 'bossHit':U.flash(true);U.bossBar(G.boss);break;
-    case 'bossIntro':U.banner(e.name,G.boss.king?'Король неуязвим в броне — бейте, когда он спустится':'Прыгайте ему на голову');$('bossName').textContent=e.name;U.bossBar(G.boss);break;
+    case 'bossIntro':U.banner(e.name,G.boss.king?'Бейте Короля, когда он спустится на землю':'Уворачивайтесь, а когда он устанет — прыгайте ему на голову');$('bossName').textContent=e.name;U.bossBar(G.boss);break;
     case 'armorOn':U.toast('Броня! Сбейте её лапой или перекатом');break;
     case 'bossDown':U.bossBar(null);U.banner(e.king?'Король Теней повержен!':'Генерал повержен!','Дверь открыта');break;
     case 'checkpoint':U.toast('Фонарь зажжён — отсюда можно продолжить');break;
@@ -402,6 +402,8 @@ U.onEvent=function(e){
     case 'comboEnd':if(e.n>=3)U.banner(`Комбо ×${e.n}!`,e.n>=5?'Невероятно!':'Отлично!');break;
     case 'shieldBreak':U.toast('Щит Колючки спас вас!');break;
     case 'item':U.toast(`${K.ITEMS[e.type].name}: ${e.have}/${e.need}`,itemPic(e.type,26));if(K.cageReady())setTimeout(()=>U.banner('Всё собрано!','Бегите к клетке'),600);break;
+    case 'bossTired':U.banner(e.king?'Король спустился!':'Генерал устал!',e.king?(e.armor?'Бейте его перекатом или лапой — сейчас!':'Прыгайте ему на голову — сейчас!'):'Прыгайте ему на голову — сейчас!');break;
+    case 'bossNope':U.toast(e.king?'Король в воздухе — ждите, пока он спустится':'Рано! Ждите, пока над ним появится стрелка');break;
     case 'kit':U.toast('+1 ловушка',itemPic('kit',26));break;
     case 'fishLocked':{const g=K.ABIL_FRIEND[e.gate];if(g)U.banner('Золотая рыбка под замком',`Нужно умение «${g.abilName}» (${g.name}). Вернитесь сюда, когда спасёте друга`);break}
     case 'hint':{const h={double:['Двойной прыжок!','Нажмите прыжок ещё раз прямо в воздухе'],wall:['Прыжок от стены!','Прыгните к стене и жмите прыжок, касаясь её'],paw:['Удар лапой!',matchMedia('(pointer:coarse)').matches?'Нажмите «ЛАПА» у треснувшей стены':'Нажмите X у треснувшей стены, чтобы её сломать'],glide:['Планируйте!','Удерживайте прыжок, пока падаете']}[e.k];if(h)U.banner(h[0],h[1]);break}
