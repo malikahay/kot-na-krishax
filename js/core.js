@@ -1,8 +1,32 @@
 /* Кот на крышах — симуляция игры (без DOM). 60 шагов в секунду, координаты в пикселях (тайл = 16).
-   Всё, что должно быть услышано или показано, уходит событиями в K.events. */
+   Всё, что должно быть услышано или показано, уходит событиями в K.events.
+   Физика и бой вынесены в K.TUNE — баланс правится там, а логика ниже его только использует.
+   Числа внутри ИИ боссов и пса — их характер, их можно править прямо в соответствующих функциях. */
 (function(K){
 'use strict';
 const T=K.T, ROWS=K.ROWS;
+
+/* ---------- тюнинг ---------- */
+const TUNE=K.TUNE={
+  GRAVITY:.35, MAX_FALL:7,                      // гравитация и предел скорости падения
+  RUN_ACC:.3, AIR_ACC:.24, FRICTION_G:.74, FRICTION_A:.93, STOP_VX:.05,
+  MAX_VX:1.95, MAX_VX_GLIDE:2.2, SLIME_MAX_VX:.8,
+  JUMP_V:-6.2, JUMP_V_SLIME:-4.4, DJUMP_V:-5.7, JUMP_CUT:-2.5, COYOTE:6, BUFFER:8,
+  WALLJUMP_V:-5.9, WALLJUMP_KICK:2.7, WALLJUMP_LOCK:10,
+  GLIDE_FALL:.85, SLIDE_FALL:1.1,
+  WIND_GROUND:.8, WIND_AIR:1.2, WIND_FY:.12, WIND_FY_GLIDE:.7, WIND_GLIDE_VY:-3.2,
+  DASH_T:13, DASH_CD:34, DASH_VX:4.8, DASH_END_VX:2, DASH_AIR_VY:.3,
+  PAW_T:12, PAW_CD:22, PAW_HIT_MIN:4, PAW_HIT_MAX:10,
+  HURT_VY:-3.8, HURT_VX:2.2, INV_HURT:100, INV_CONTINUE:120,
+  SHIELD_VY:-3.5, SHIELD_VX:2, SHIELD_INV:90,
+  STOMP_VY_HELD:-6.4, STOMP_VY:-4.6, STOMP_OVERLAP:6, BOSS_STOMP_OVERLAP:10, BOSS_BOUNCE_VY:-7.5,
+  SPRING_T:26, SPRING_CD:14,
+  COMBO_MAX:8, HITSTOP_STOMP:5, HITSTOP_SMASH:4, HITSTOP_BOSS:10, HITSTOP_ARMOR:8,
+  MAGNET_R:52, MAGNET_PULL:.18, MAGNET_PULL_SLOW:.12,
+  PICK_R:10, PICK_RY:11, ITEM_R:11, ITEM_RY:12, FISH_R:11, FISH_RY:12,
+  SPIKE_TOP:7, FALL_KILL_Y:24, GHOST_REC_MAX:40000
+};
+
 const G=K.G={state:'idle'};
 const ev=K.events=[];
 const emit=(t,o={})=>{o.t=t;ev.push(o);return o};
@@ -135,22 +159,22 @@ function landOnPlatforms(P){
 function hurt(src){
   const P=G.P;
   if(P.inv>0||P.dash>0||G.state!=='play')return;
-  if(P.shield){P.shield=false;P.inv=90;P.vy=-3.5;P.vx=-P.face*2;emit('shieldBreak',{x:P.x+6,y:P.y+7});return}
+  if(P.shield){P.shield=false;P.inv=TUNE.SHIELD_INV;P.vy=TUNE.SHIELD_VY;P.vx=-P.face*TUNE.SHIELD_VX;emit('shieldBreak',{x:P.x+6,y:P.y+7});return}
   G.lives--;G.dmg++;emit('hurt',{x:P.x+6,y:P.y+7});
   if(G.lives<=0){die();return}
-  P.inv=100;P.vy=-3.8;P.vx=-P.face*2.2;P.dash=0;
+  P.inv=TUNE.INV_HURT;P.vy=TUNE.HURT_VY;P.vx=-P.face*TUNE.HURT_VX;P.dash=0;
 }
 function fell(){
   const P=G.P;
   G.lives--;G.dmg++;emit('fall',{x:P.x+6,y:P.y});
   if(G.lives<=0){die();return}
-  P.x=P.safe.x;P.y=P.safe.y;P.vx=P.vy=0;P.inv=100;P.dash=0;P.ride=null;
+  P.x=P.safe.x;P.y=P.safe.y;P.vx=P.vy=0;P.inv=TUNE.INV_HURT;P.dash=0;P.ride=null;
   if(G.chase){G.chase.trail.push([P.x,P.y]);G.chase.idx=Math.max(G.chase.idx-60,0)}
 }
 function die(){G.state='dead';G.deaths++;emit('dead')}
 K.continueRun=function(){
   const P=G.P;G.lives=G.maxLives;G.state='play';
-  P.x=P.check.x;P.y=P.check.y;P.vx=P.vy=0;P.inv=120;P.dash=0;P.ride=null;P.safe={...P.check};
+  P.x=P.check.x;P.y=P.check.y;P.vx=P.vy=0;P.inv=TUNE.INV_CONTINUE;P.dash=0;P.ride=null;P.safe={...P.check};
   if(G.abil.has('shield'))P.shield=true;
   if(G.boss){G.boss.hp=Math.min(G.boss.maxHp,G.boss.hp+1);G.shots.length=0}
   if(G.chase){const C=G.chase;C.trail.push([P.x,P.y]);C.idx=Math.max(0,C.trail.length-1-260);C.stun=90}
@@ -158,28 +182,23 @@ K.continueRun=function(){
 };
 
 function addScore(n,x,y,col){G.score+=n;emit('pop',{x,y,text:'+'+n,col})}
-function stompBounce(P){P.vy=K.input.jump?-6.4:-4.6;P.airJumps=1;P.canDash=true;P.springT=0}
+function stompBounce(P){P.vy=K.input.jump?TUNE.STOMP_VY_HELD:TUNE.STOMP_VY;P.airJumps=1;P.canDash=true;P.springT=0}
 function killEnemy(e,how){
   e.alive=false;e.squash=0;
   const P=G.P;
   if(!P.onGround)G.combo++;else G.combo=Math.max(G.combo,1);
   G.comboBest=Math.max(G.comboBest,G.combo);G.stomps++;
-  const mult=Math.min(G.combo,8),pts=100*mult;
+  const mult=Math.min(G.combo,TUNE.COMBO_MAX),pts=100*mult;
   G.score+=pts;
-  G.hitstop=how==='stomp'?5:4;
+  G.hitstop=how==='stomp'?TUNE.HITSTOP_STOMP:TUNE.HITSTOP_SMASH;
   emit(how,{x:e.x+e.w/2,y:e.y+e.h/2,combo:G.combo,type:e.type});
   emit('pop',{x:e.x+e.w/2,y:e.y-4,text:mult>1?`+${pts} ×${mult}`:`+${pts}`,col:mult>1?'#ff8fd0':'#ffd85a',big:mult>1});
 }
 
-/* ---------- основной шаг ---------- */
-K.step=function(){
-  if(G.state!=='play')return;
-  if(G.hitstop>0){G.hitstop--;return}
-  G.frame++;G.time++;
+/* ---------- шаг игры: фазы ---------- */
+/* Ввод, движение, физика, подсказки, безопасная точка. */
+function stepPlayer(){
   const P=G.P,inp=K.input,taps=inp.taps,A=G.abil;
-  updateMovers(false);
-  if(P.ride){if(G.movers.includes(P.ride)){P.x+=P.ride.dx;P.y+=P.ride.dy}else if(P.ride.st==='fall')P.y+=P.ride.vy}
-
   const dir=(inp.right?1:0)-(inp.left?1:0);
   if(P.lock>0)P.lock--;
   if(P.dashCd>0)P.dashCd--;
@@ -189,55 +208,55 @@ K.step=function(){
   // перекат
   if(taps.dash&&A.has('dash')&&P.dashCd===0&&P.canDash&&P.dash===0){
     if(dir)P.face=dir;
-    P.dash=13;P.dashCd=34;P.canDash=P.onGround;P.vy=Math.min(P.vy,0);emit('dash',{x:P.x+6,y:P.y+7,dir:P.face});
+    P.dash=TUNE.DASH_T;P.dashCd=TUNE.DASH_CD;P.canDash=P.onGround;P.vy=Math.min(P.vy,0);emit('dash',{x:P.x+6,y:P.y+7,dir:P.face});
   }
   // удар лапой
-  if(taps.paw&&A.has('paw')&&P.pawCd===0){if(dir)P.face=dir;P.paw=12;P.pawCd=22;emit('paw',{x:P.x+6+P.face*10,y:P.y+7,dir:P.face})}
+  if(taps.paw&&A.has('paw')&&P.pawCd===0){if(dir)P.face=dir;P.paw=TUNE.PAW_T;P.pawCd=TUNE.PAW_CD;emit('paw',{x:P.x+6+P.face*10,y:P.y+7,dir:P.face})}
 
   if(P.dash>0){
-    P.dash--;P.vx=P.face*4.8;P.vy=P.onGround?P.vy:Math.min(P.vy,.3);
-    if(P.dash===0)P.vx=P.face*2;
+    P.dash--;P.vx=P.face*TUNE.DASH_VX;P.vy=P.onGround?P.vy:Math.min(P.vy,TUNE.DASH_AIR_VY);
+    if(P.dash===0)P.vx=P.face*TUNE.DASH_END_VX;
   }else{
-    const maxV=P.gliding?2.2:1.95;
-    if(dir&&P.lock===0){P.vx+=dir*(P.onGround?.3:.24);P.face=dir}
-    else if(!dir){P.vx*=P.onGround?.74:.93;if(Math.abs(P.vx)<.05)P.vx=0}
+    const maxV=P.gliding?TUNE.MAX_VX_GLIDE:TUNE.MAX_VX;
+    if(dir&&P.lock===0){P.vx+=dir*(P.onGround?TUNE.RUN_ACC:TUNE.AIR_ACC);P.face=dir}
+    else if(!dir){P.vx*=P.onGround?TUNE.FRICTION_G:TUNE.FRICTION_A;if(Math.abs(P.vx)<TUNE.STOP_VX)P.vx=0}
     if(Math.abs(P.vx)>maxV)P.vx=Math.sign(P.vx)*Math.max(maxV,Math.abs(P.vx)*.9);
-    if(P.slimed){P.vx=Math.max(-.8,Math.min(.8,P.vx))}
+    if(P.slimed){P.vx=Math.max(-TUNE.SLIME_MAX_VX,Math.min(TUNE.SLIME_MAX_VX,P.vx))}
   }
 
   // прыжки
-  if(taps.jump)P.buffer=8;
-  P.coyote=P.onGround?6:Math.max(0,P.coyote-1);
+  if(taps.jump)P.buffer=TUNE.BUFFER;
+  P.coyote=P.onGround?TUNE.COYOTE:Math.max(0,P.coyote-1);
   if(P.buffer>0){
     P.buffer--;
-    if(P.coyote>0){P.vy=P.slimed?-4.4:-6.2;P.coyote=0;P.buffer=0;P.onGround=false;P.ride=null;emit('jump',{x:P.x+6,y:P.y+P.h})}
+    if(P.coyote>0){P.vy=P.slimed?TUNE.JUMP_V_SLIME:TUNE.JUMP_V;P.coyote=0;P.buffer=0;P.onGround=false;P.ride=null;emit('jump',{x:P.x+6,y:P.y+P.h})}
     else if(A.has('wall')&&P.wallDir&&!P.onGround){
-      P.vy=-5.9;P.vx=-P.wallDir*2.7;P.face=-P.wallDir;P.lock=10;P.buffer=0;P.airJumps=1;P.canDash=true;
+      P.vy=TUNE.WALLJUMP_V;P.vx=-P.wallDir*TUNE.WALLJUMP_KICK;P.face=-P.wallDir;P.lock=TUNE.WALLJUMP_LOCK;P.buffer=0;P.airJumps=1;P.canDash=true;
       emit('walljump',{x:P.x+6+P.wallDir*6,y:P.y+7,dir:P.wallDir});
     }
-    else if(taps.jump&&A.has('double')&&P.airJumps>0&&P.dash===0){P.vy=-5.7;P.airJumps=0;P.buffer=0;emit('djump',{x:P.x+6,y:P.y+P.h})}
+    else if(taps.jump&&A.has('double')&&P.airJumps>0&&P.dash===0){P.vy=TUNE.DJUMP_V;P.airJumps=0;P.buffer=0;emit('djump',{x:P.x+6,y:P.y+P.h})}
   }
   taps.jump=taps.dash=taps.paw=0;
-  if(!inp.jump&&P.vy<-2.5&&P.springT===0)P.vy=-2.5;
+  if(!inp.jump&&P.vy<TUNE.JUMP_CUT&&P.springT===0)P.vy=TUNE.JUMP_CUT;
 
   // гравитация, планирование, скольжение по стене
-  if(P.dash===0||P.onGround)P.vy+=.35;
+  if(P.dash===0||P.onGround)P.vy+=TUNE.GRAVITY;
   P.gliding=false;P.sliding=false;
-  if(A.has('glide')&&inp.jump&&!P.onGround&&P.dash===0&&(P.vy>0||P.glideHold)){P.vy=Math.min(P.vy,.85);P.gliding=true;P.glideHold=true}
+  if(A.has('glide')&&inp.jump&&!P.onGround&&P.dash===0&&(P.vy>0||P.glideHold)){P.vy=Math.min(P.vy,TUNE.GLIDE_FALL);P.gliding=true;P.glideHold=true}
   else if(!inp.jump||P.onGround)P.glideHold=false;
-  if(A.has('wall')&&!P.onGround&&P.wallDir&&dir===P.wallDir&&P.vy>1.1){P.vy=1.1;P.sliding=true}
+  if(A.has('wall')&&!P.onGround&&P.wallDir&&dir===P.wallDir&&P.vy>TUNE.SLIDE_FALL){P.vy=TUNE.SLIDE_FALL;P.sliding=true}
   // ветер
   let push=0;
   const cx=P.x+6,cy=P.y+7;
   for(const w of G.winds){
     if(cx<w.x||cx>w.x+w.w||cy<w.y||cy>w.y+w.h)continue;
-    push+=w.fx*(P.onGround?.8:1.2);
-    if(w.fy){if(P.gliding)P.vy=Math.max(-3.2,P.vy+w.fy*.7);else P.vy+=w.fy*.12}
+    push+=w.fx*(P.onGround?TUNE.WIND_GROUND:TUNE.WIND_AIR);
+    if(w.fy){if(P.gliding)P.vy=Math.max(TUNE.WIND_GLIDE_VY,P.vy+w.fy*TUNE.WIND_FY_GLIDE);else P.vy+=w.fy*TUNE.WIND_FY}
     w.active=G.frame;
   }
-  P.vy=Math.min(P.vy,7);
+  P.vy=Math.min(P.vy,TUNE.MAX_FALL);
 
-  const vx0=P.vx;P.vx+=push;
+  P.vx+=push;
   const hit=moveX(P);
   if(!hit)P.vx-=push;else P.vx=0;
   if(hit&&P.dash>0){P.dash=0}
@@ -247,7 +266,7 @@ K.step=function(){
   moveY(P);
   if(P.y<0){P.y=0;if(P.vy<0)P.vy=0}
   if(!P.onGround){P.ride=null;landOnPlatforms(P)}else P.ride=null;
-    // стены рядом (для прыжков от стен)
+  // стены рядом (для прыжков от стен)
   P.wallDir=0;
   if(!P.onGround){
     const top=Math.floor((P.y+2)/T),bot=Math.floor((P.y+P.h-3)/T);
@@ -265,29 +284,40 @@ K.step=function(){
   if(!P.onGround&&P.vy>2&&A.has('glide')&&!G.hinted.glide&&!standable(Math.floor(cx/T),Math.floor((P.y+P.h+40)/T))&&P.y>4*T){let pit=true;for(let r=Math.floor((P.y+P.h)/T);r<ROWS;r++)if(standable(Math.floor(cx/T),r))pit=false;if(pit){G.hinted.glide=1;emit('hint',{k:'glide'})}}
   if(P.onGround&&!P.ride&&P.inv===0&&G.frame%15===0&&!nearHazard())P.safe={x:P.x,y:P.y};
   if(G.mode==='endless')G.distance=Math.max(G.distance,Math.floor(P.x/T));
+}
 
-  // ловушка
+/* Ловушки для пса. */
+function stepTraps(){
+  const P=G.P,taps=K.input.taps;
   if(G.trapCd>0)G.trapCd--;
   if(taps.trap&&G.trapDef){
     if(G.trapsLeft>0&&P.onGround&&G.trapCd===0&&G.chase){G.trapsLeft--;G.trapCd=30;G.traps.push({x:P.x-2,y:P.y+P.h-8,w:16,h:8,armed:true,t:0,tier:G.trapTier});emit('trapSet',{x:P.x+6,y:P.y+P.h})}
     else emit('trapNo',{reason:!G.chase?'none':G.trapsLeft<=0?'empty':'air'});
   }
   taps.trap=0;
-  if(G.chase)updateChaser(G.chase,P);
-  if(G.state!=='play')return;
-  // запись для «призрака»
-  if(G.frame%2===0&&G.rec.length<40000){const yy=Math.max(0,Math.round(P.y));G.rec.push(Math.round(P.x),P.face>0?yy:-yy-1)}
+}
 
-  // шипы и пропасти
+/* Запись позиций для «призрака». */
+function recordGhost(){
+  const P=G.P;
+  if(G.frame%2===0&&G.rec.length<TUNE.GHOST_REC_MAX){const yy=Math.max(0,Math.round(P.y));G.rec.push(Math.round(P.x),P.face>0?yy:-yy-1)}
+}
+
+/* Шипы и пропасти. */
+function stepHazards(){
+  const P=G.P;
   const l=Math.floor((P.x+2)/T),r=Math.floor((P.x+P.w-2)/T),t=Math.floor((P.y+4)/T),b=Math.floor((P.y+P.h-1)/T);
-  for(let ty=t;ty<=b;ty++)for(let tx=l;tx<=r;tx++)if(tile(tx,ty)===3&&P.y+P.h>ty*T+7)hurt('spike');
+  for(let ty=t;ty<=b;ty++)for(let tx=l;tx<=r;tx++)if(tile(tx,ty)===3&&P.y+P.h>ty*T+TUNE.SPIKE_TOP)hurt('spike');
   if(G.state!=='play')return;
-  if(P.y>ROWS*T+24){fell();if(G.state!=='play')return}
+  if(P.y>ROWS*T+TUNE.FALL_KILL_Y){fell()}
+}
 
-  // удар лапой: ломает стены, врагов, шары
+/* Удар лапой и перекат: ломает стены, врагов, шары. */
+function stepHits(){
+  const P=G.P;
   if(P.paw>0){
     P.paw--;
-    if(P.paw>=4&&P.paw<=10){
+    if(P.paw>=TUNE.PAW_HIT_MIN&&P.paw<=TUNE.PAW_HIT_MAX){
       const hb={x:P.face>0?P.x+P.w-2:P.x-16,y:P.y-2,w:18,h:P.h+4};
       breakTiles(hb);
       for(const e of G.enemies)if(e.alive&&overlap(hb,e))killEnemy(e,'smash');
@@ -300,32 +330,35 @@ K.step=function(){
     for(const e of G.enemies)if(e.alive&&overlap(hb,e))killEnemy(e,'smash');
     if(G.boss)bossStrike(hb,'dash');
   }
+}
 
-  // платформы-черепица
+/* Платформы-черепица, пружины, фонари-чекпоинты. */
+function stepPlates(){
+  const P=G.P,A=G.abil;
   for(const f of G.falls){
     if(f.st==='idle'&&P.ride===f){f.st='shake';f.t=0;emit('crack',{x:f.x+8,y:f.y})}
     if(f.st==='shake'&&++f.t>28){f.st='fall';f.vy=0}
     if(f.st==='fall'){f.vy=Math.min(6,f.vy+.3);f.y+=f.vy;if(f.y>ROWS*T+40){f.st='gone';f.t=0}}
     if(f.st==='gone'&&++f.t>200){if(!(P.x+P.w>f.x&&P.x<f.x+f.w&&Math.abs(P.y+P.h-f.y0)<20)){f.st='idle';f.y=f.y0;f.vy=0}}
   }
-  // пружины
   for(const s of G.springs){
     if(s.t>0)s.t--;
-    if(P.vy>=0&&overlap(P,s)&&P.y+P.h-P.vy<=s.y+8){P.vy=-s.power;P.y=s.y-P.h;P.springT=26;P.airJumps=1;P.canDash=true;P.onGround=false;s.t=14;G.combo=Math.max(G.combo,0);emit('spring',{x:s.x+6,y:s.y})}
+    if(P.vy>=0&&overlap(P,s)&&P.y+P.h-P.vy<=s.y+8){P.vy=-s.power;P.y=s.y-P.h;P.springT=TUNE.SPRING_T;P.airJumps=1;P.canDash=true;P.onGround=false;s.t=TUNE.SPRING_CD;G.combo=Math.max(G.combo,0);emit('spring',{x:s.x+6,y:s.y})}
   }
-  // фонари-чекпоинты
   for(const c of G.checks){
     if(!c.on&&overlap(P,c)){c.on=true;P.check={x:c.x-1,y:c.y+30-P.h};P.safe={...P.check};if(A.has('shield'))P.shield=true;emit('checkpoint',{x:c.x+5,y:c.y})}
   }
+}
 
-  // враги
+/* Враги и вражеские шары. */
+function stepFoes(){
+  const P=G.P;
   for(const e of G.enemies){
     if(!e.alive){e.squash++;continue}
     e.t++;if(e.flash>0)e.flash--;
     updateEnemy(e,P);
     if(G.state!=='play')return;
   }
-  // вражеские шары
   for(const s of G.shots){
     if(s.dead)continue;
     s.x+=s.vx;s.y+=s.vy;s.life--;
@@ -339,7 +372,11 @@ K.step=function(){
     }
   }
   if(G.frame%60===0)G.shots=G.shots.filter(s=>!s.dead);
-  // сталактиты
+}
+
+/* Берлога: сталактиты, гейзеры, слизь. */
+function stepCave(){
+  const P=G.P,cx=P.x+6;
   for(const d of G.drips){
     if(d.st==='hang'){if(Math.abs(cx-(d.x+4))<22&&P.y>d.y){d.st='shake';d.t=0;emit('dripShake',{x:d.x+4,y:d.y})}}
     else if(d.st==='shake'){if(++d.t>22){d.st='fall';d.vy=0}}
@@ -348,46 +385,50 @@ K.step=function(){
       else if(solidWall(Math.floor((d.x+4)/T),Math.floor((d.y+d.h)/T))||standable(Math.floor((d.x+4)/T),Math.floor((d.y+d.h)/T))||d.y>ROWS*T){d.st='gone';d.t=0;emit('dripBreak',{x:d.x+4,y:d.y+d.h})}}
     else if(d.st==='gone'&&++d.t>360&&Math.abs(cx-(d.x+4))>60){d.st='hang';d.y=d.y0}
   }
-  // гейзеры огня теней
   for(const g of G.geysers){
     const ph=(G.frame+g.phase)%210;g.warn=ph>=120&&ph<150;const was=g.on;g.on=ph>=150;
     if(g.on&&!was)emit('geyser',{x:g.x+6,y:g.y+64});
     if(g.on&&overlap(P,{x:g.x,y:g.y,w:g.w,h:g.h})){hurt('fire');if(G.state!=='play')return}
   }
-  // слизь
-  {const tx=Math.floor(cx/T),ty=Math.floor((P.y+P.h-2)/T);P.slimed=P.onGround&&tile(tx,ty)===6;}
-  if(G.boss){updateBoss(G.boss,P);if(G.state!=='play')return}
+  const tx=Math.floor(cx/T),ty=Math.floor((P.y+P.h-2)/T);
+  P.slimed=P.onGround&&tile(tx,ty)===6;
+}
 
-  // звёзды, сердца, рыбки
+/* Звёзды, сердца, рыбки и вещи для спасения. */
+function stepPickups(){
+  const P=G.P,A=G.abil,cx=P.x+6,cy=P.y+7;
   const mag=A.has('magnet');
   for(const s of G.stars){
     if(s.got)continue;
     const dx=cx-s.x,dy=cy-s.y;
-    if(mag&&dx*dx+dy*dy<52*52){s.x+=dx*.18;s.y+=dy*.18}
-    if(Math.abs(dx)<10&&Math.abs(dy)<11){
+    if(mag&&dx*dx+dy*dy<TUNE.MAGNET_R*TUNE.MAGNET_R){s.x+=dx*TUNE.MAGNET_PULL;s.y+=dy*TUNE.MAGNET_PULL}
+    if(Math.abs(dx)<TUNE.PICK_R&&Math.abs(dy)<TUNE.PICK_RY){
       s.got=true;G.starsGot++;
       G.starChain=G.frame-G.lastStar<45?G.starChain+1:0;G.lastStar=G.frame;
       G.score+=10;emit('star',{x:s.x,y:s.y,chain:G.starChain});
     }
   }
-  for(const h of G.hearts){if(!h.got&&Math.abs(cx-h.x)<10&&Math.abs(cy-h.y)<11){h.got=true;G.lives=Math.min(G.maxLives+1,G.lives+1);addScore(25,h.x,h.y-8,'#ff8fb0');emit('heart',{x:h.x,y:h.y})}}
+  for(const h of G.hearts){if(!h.got&&Math.abs(cx-h.x)<TUNE.PICK_R&&Math.abs(cy-h.y)<TUNE.PICK_RY){h.got=true;G.lives=Math.min(G.maxLives+1,G.lives+1);addScore(25,h.x,h.y-8,'#ff8fb0');emit('heart',{x:h.x,y:h.y})}}
   for(const f of G.fish){
     if(f.got)continue;
     const dx=cx-f.x,dy=cy-f.y;
     if(!f.told&&f.gate&&!A.has(f.gate)&&Math.abs(dx)<6*T){f.told=true;emit('fishLocked',{gate:f.gate})}
-    if(mag&&dx*dx+dy*dy<52*52){f.x+=dx*.12;f.y+=dy*.12}
-    if(Math.abs(dx)<11&&Math.abs(dy)<12){f.got=true;addScore(500,f.x,f.y-8,'#ffe58a');emit('fish',{x:f.x,y:f.y})}
+    if(mag&&dx*dx+dy*dy<TUNE.MAGNET_R*TUNE.MAGNET_R){f.x+=dx*TUNE.MAGNET_PULL_SLOW;f.y+=dy*TUNE.MAGNET_PULL_SLOW}
+    if(Math.abs(dx)<TUNE.FISH_R&&Math.abs(dy)<TUNE.FISH_RY){f.got=true;addScore(500,f.x,f.y-8,'#ffe58a');emit('fish',{x:f.x,y:f.y})}
   }
-  // вещи для спасения
   for(const it of G.items){
     if(it.got)continue;const dx=cx-it.x,dy=cy-it.y;
-    if(mag&&dx*dx+dy*dy<52*52){it.x+=dx*.12;it.y+=dy*.12}
-    if(Math.abs(dx)<11&&Math.abs(dy)<12){it.got=true;
+    if(mag&&dx*dx+dy*dy<TUNE.MAGNET_R*TUNE.MAGNET_R){it.x+=dx*TUNE.MAGNET_PULL_SLOW;it.y+=dy*TUNE.MAGNET_PULL_SLOW}
+    if(Math.abs(dx)<TUNE.ITEM_R&&Math.abs(dy)<TUNE.ITEM_RY){it.got=true;
       if(it.type==='kit'){G.trapsLeft++;emit('kit',{x:it.x,y:it.y})}
       else{G.have[it.type]++;emit('item',{x:it.x,y:it.y,type:it.type,have:G.have[it.type],need:G.need[it.type]||0})}
       addScore(150,it.x,it.y-8,'#ffe08a')}
   }
-  // клетка с другом: открывается, только когда собраны все вещи
+}
+
+/* Клетка с другом, подсказки и дверь выхода. */
+function stepCageGoal(){
+  const P=G.P,cx=P.x+6;
   if(G.cage&&!G.cage.open&&overlap(P,G.cage)&&!K.cageReady()){
     if(!G.cage.msgT||G.frame-G.cage.msgT>150){G.cage.msgT=G.frame;emit('cageLocked',{missing:K.cageMissing()})}
   }
@@ -399,12 +440,34 @@ K.step=function(){
     emit('rescue',{friend:fr.id,x:G.cage.x+12,y:G.cage.y+10});
     G.state='rescue';return;
   }
-  // дверь
   for(const t of G.tips)if(!t.shown&&cx>=t.x){t.shown=true;emit('tip',{title:t.title,text:t.text})}
   if(G.goal&&overlap(P,G.goal)&&!(G.cage&&!G.cage.open)){
     if(!G.cage&&!K.cageReady()){if(G.frame-G.doorMsgT>150){G.doorMsgT=G.frame;emit('doorLocked',{missing:K.cageMissing()})}}
     else{G.state='won';emit('win');return}
   }
+}
+
+/* Основной шаг: порядок фаз важен и повторяет оригинальный цикл. */
+K.step=function(){
+  if(G.state!=='play')return;
+  if(G.hitstop>0){G.hitstop--;return}
+  G.frame++;G.time++;
+  updateMovers(false);
+  const P=G.P;
+  if(P.ride){if(G.movers.includes(P.ride)){P.x+=P.ride.dx;P.y+=P.ride.dy}else if(P.ride.st==='fall')P.y+=P.ride.vy}
+  stepPlayer();
+  stepTraps();
+  if(G.chase)updateChaser(G.chase,P);
+  if(G.state!=='play')return;
+  recordGhost();
+  stepHazards();if(G.state!=='play')return;
+  stepHits();
+  stepPlates();
+  stepFoes();if(G.state!=='play')return;
+  stepCave();if(G.state!=='play')return;
+  if(G.boss){updateBoss(G.boss,P);if(G.state!=='play')return}
+  stepPickups();
+  stepCageGoal();
 };
 function nearHazard(){
   const P=G.P,tx=Math.floor((P.x+6)/T),ty=Math.floor((P.y+P.h+1)/T);
@@ -421,6 +484,16 @@ function breakTiles(hb){
 /* ---------- вещи и клетка ---------- */
 K.cageMissing=function(){const m={};for(const k in G.need){const d=G.need[k]-(G.have[k]||0);if(d>0)m[k]=d}return m};
 K.cageReady=function(){return Object.keys(K.cageMissing()).length===0};
+
+/* ---------- миграция сохранений ---------- */
+K.migrateSave=function(S){
+  if((S.ver||1)>=3)return false;
+  const M=K.LEVEL_MIGRATE,mv=o=>{const n={};for(const k in o)n[M[k]||k]=o[k];return n};
+  S.levels=mv(S.levels||{});S.ghosts=mv(S.ghosts||{});
+  if(S.levels['1-1'])S.levels['1-0']=S.levels['1-0']||{stars:[true,false,false],time:0,score:0,fish:false};
+  delete S.mapPos;S.ver=3;
+  return true;
+};
 
 /* ---------- преследователь: бежит точно по следу кота ---------- */
 function updateChaser(C,P){
@@ -471,7 +544,7 @@ function updateEnemy(e,P){
       e.x+=e.vx;e.y+=e.vy;
     }
   }else{
-    e.vy=Math.min(7,e.vy+.35);
+    e.vy=Math.min(TUNE.MAX_FALL,e.vy+TUNE.GRAVITY);
     if(e.type==='shooter'){
       e.face=dxp>0?1:-1;
       if(Math.abs(dxp)<11*T&&Math.abs(dyp)<6*T){
@@ -497,7 +570,7 @@ function updateEnemy(e,P){
   }
   if(overlap(P,e)){
     if(P.dash>0)return killEnemy(e,'smash');
-    const stomp=P.vy>0&&P.y+P.h-P.vy<=e.y+6;
+    const stomp=P.vy>0&&P.y+P.h-P.vy<=e.y+TUNE.STOMP_OVERLAP;
     if(stomp&&e.type!=='armored'){killEnemy(e,'stomp');stompBounce(P)}
     else if(stomp&&e.type==='armored'){P.vy=-5;P.y=e.y-P.h;e.flash=10;emit('clank',{x:e.x+e.w/2,y:e.y});if(P.inv===0)hurt('armor')}
     else hurt('enemy');
@@ -519,8 +592,8 @@ function bossVulnerable(B,how){
   return B.st==='tired';
 }
 function hitBoss(B,how){
-  if(B.armor&&how!=='stomp'&&!B.king){B.armor=false;B.inv=20;B.st=B.king?B.st:'tired';B.t=0;G.hitstop=8;emit('armorBreak',{x:B.x+B.w/2,y:B.y});return}
-  B.hp--;B.inv=70;G.hitstop=10;G.score+=1000;
+  if(B.armor&&how!=='stomp'&&!B.king){B.armor=false;B.inv=20;B.st=B.king?B.st:'tired';B.t=0;G.hitstop=TUNE.HITSTOP_ARMOR;emit('armorBreak',{x:B.x+B.w/2,y:B.y});return}
+  B.hp--;B.inv=70;G.hitstop=TUNE.HITSTOP_BOSS;G.score+=1000;
   emit('bossHit',{x:B.x+B.w/2,y:B.y,hp:B.hp,max:B.maxHp});
   emit('pop',{x:B.x+B.w/2,y:B.y-6,text:'+1000',col:'#ffd85a',big:true});
   if(B.hp<=0){B.st='dying';B.t=0;G.shots.length=0;G.enemies.forEach(e=>{if(e.alive){e.alive=false}});emit('bossDying',{x:B.x+B.w/2,y:B.y+B.h/2});return}
@@ -556,10 +629,10 @@ function updateBoss(B,P){
   if(B.st!==B._ps){if(B.st==='tired'||B.st==='dazed')emit('bossTired',{king:B.king,armor:B.armor});B._ps=B.st}
   // контакт с котом
   if(overlap(P,B)&&B.st!=='intro'){
-    const stomp=P.vy>0&&P.y+P.h-P.vy<=B.y+10;
+    const stomp=P.vy>0&&P.y+P.h-P.vy<=B.y+TUNE.BOSS_STOMP_OVERLAP;
     if(P.dash>0){if(bossVulnerable(B,'dash'))hitBoss(B,'dash');P.vx=-P.face*3;P.dash=0;P.vy=-4}
     else if(stomp){
-      if(bossVulnerable(B,'stomp')){hitBoss(B,'stomp');P.vy=-7.5;P.springT=20;P.airJumps=1;P.canDash=true}
+      if(bossVulnerable(B,'stomp')){hitBoss(B,'stomp');P.vy=TUNE.BOSS_BOUNCE_VY;P.springT=20;P.airJumps=1;P.canDash=true}
       else if(B.armor){P.vy=-6;emit('clank',{x:cx,y:B.y});hurt('armor')}
       else{P.vy=-6;if(!B.nopeT||G.frame-B.nopeT>120){B.nopeT=G.frame;emit('bossNope',{king:B.king})}}
     }else if(B.inv<50&&B.st!=='dazed'&&B.st!=='tired')hurt('boss');

@@ -121,6 +121,20 @@ R.init=function(canvas){
   return true;
 };
 R.resize=function(){const w=stage.clientWidth||640,h=stage.clientHeight||360;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()};
+/* Качество графики: низкое — без теней и с меньшим разрешением */
+R.setQuality=function(q){
+  if(!renderer)return;
+  const dpr=window.devicePixelRatio||1;
+  renderer.setPixelRatio(q==='low'?1:q==='med'?Math.min(dpr,1.5):Math.min(dpr,2));
+  if(moonLight){
+    moonLight.castShadow=q!=='low';
+    const sm=q==='high'?2048:1024;
+    if(moonLight.shadow.mapSize.x!==sm){moonLight.shadow.mapSize.set(sm,sm);if(moonLight.shadow.map){moonLight.shadow.map.dispose();moonLight.shadow.map=null}}
+  }
+  R.resize();
+};
+let shakeOn=true;
+R.setFx=function(o){shakeOn=o.shake!==false};
 
 let moonMesh,biteMesh,halo;
 function buildSky(){
@@ -144,11 +158,12 @@ R.setTheme=function(th){
   M.roof.color.setHex(th.roof);M.plank.color.setHex(th.roof).multiplyScalar(.8);
   hemi.color.setHex(th.hemi);moonMesh.material.color.setHex(th.moon);biteMesh.material.color.set(th.sky[0]);
   M.deco.color.setHex(th.near[0]);M.decoLight.color.setHex(th.near[1]);
+  if(winTexes)winTexes.forEach(t=>t.dispose());
   winTexes=makeWinTexes(th);
   moonLight.intensity=th.cave?.5:.95;hemi.intensity=th.cave?.45:.6;
   M.brick.map=th.cave?stoneTex:brickTex;M.brick.needsUpdate=true;sky.visible=!th.cave;M.roof.emissive=new THREE.Color(th.cave?0x0a3a28:0x000000);
   scene.fog=new THREE.Fog(th.fog,th.cave?18:28,th.cave?70:95);
-  for(const k in skyMats)delete skyMats[k];
+  for(const k in skyMats){for(const m of skyMats[k])m.dispose();delete skyMats[k]}
 };
 const skyMats={};
 function skyMat(layer,v){const k=layer+'_'+v;if(skyMats[k])return skyMats[k];
@@ -164,7 +179,7 @@ function buildParticles(){
     const p=new THREE.Points(g,new THREE.PointsMaterial({size,vertexColors:true,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));p.frustumCulled=false;scene.add(p);return [p,g,pos,col]};
   [pts,pGeo,pPos,pCol]=mk(.14);[ptsB,pGeoB,pPosB,pColB]=mk(.32);
 }
-function part(x,y,o){if(parts.length>=PMAX*2-10)parts.shift();parts.push(Object.assign({x,y,z:(Math.random()-.5)*.8,vx:0,vy:0,vz:0,life:40,max:40,col:0xffffff,big:false,grav:-.004,drag:.96},o))}
+function part(x,y,o){if(parts.length>=PMAX*2-10)parts.splice(0,PMAX>>1);parts.push(Object.assign({x,y,z:(Math.random()-.5)*.8,vx:0,vy:0,vz:0,life:40,max:40,col:0xffffff,big:false,grav:-.004,drag:.96},o))}
 function burst(x,y,col,n=10,sp=.12,o={}){for(let i=0;i<n;i++){const a=Math.random()*Math.PI*2,s=sp*(.4+Math.random());const l=30+Math.random()*20;part(x,y,Object.assign({vx:Math.cos(a)*s,vy:Math.sin(a)*s+.03,vz:(Math.random()-.5)*s,life:l,max:l,col,big:Math.random()<.3},o))}}
 function dust(x,y,n=4,dir=0){for(let i=0;i<n;i++){const l=18+Math.random()*14;part(x+(Math.random()-.5)*.3,y+.05,{vx:(Math.random()-.5)*.04-dir*.03,vy:.01+Math.random()*.025,vz:(Math.random()-.5)*.04,life:l,max:l,col:0x6a5f9a,grav:0,drag:.92,big:Math.random()<.5})}}
 function updateParticles(){
@@ -649,7 +664,7 @@ R.frame=function(dt,now){
   else{tx=clampCam(cx+P.face*2.5);ty=6.3+Math.max(0,cy-8)*.55-(Math.max(0,4-cy))*.3}
   if(R._snap){camX=tx;camY=ty;R._snap=false}
   camX+=(tx-camX)*Math.min(1,dt*4);camY+=(ty-camY)*Math.min(1,dt*3);
-  const sh=shake>0?shake:0;const sx=(Math.random()-.5)*.05*sh,sy=(Math.random()-.5)*.05*sh;if(shake>0)shake=Math.max(0,shake-dt*30);
+  const sh=shakeOn&&shake>0?shake:0;const sx=(Math.random()-.5)*.05*sh,sy=(Math.random()-.5)*.05*sh;if(shake>0)shake=Math.max(0,shake-dt*30);
   camera.position.set(camX+(R.hub?.8:1.6)+sx,camY+(R.hub?.9:1.4)+sy,effDist());camera.lookAt(camX,camY,0);
   sky.position.x=camX;
   moonLight.position.set(camX+9,24,18);moonLight.target.position.set(camX,3,0);

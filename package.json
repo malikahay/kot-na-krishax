@@ -1,0 +1,10 @@
+{
+  "name": "kot-na-kryshakh",
+  "version": "2.1.0",
+  "private": true,
+  "description": "Кот на крышах — ночной 3D-платформер на three.js",
+  "scripts": {
+    "test": "node --test tests/"
+  },
+  "license": "MIT"
+}

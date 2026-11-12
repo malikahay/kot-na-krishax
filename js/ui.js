@@ -149,7 +149,12 @@ function setPane(){
 function optRows(O){const dog=O.dog||'normal';
   return `<div class="kv"><span>Пёс-преследователь</span><span class="seg">${[['normal','Обычный'],['easy','Лёгкий'],['off','Выкл']].map(([v,n])=>`<button class="${dog===v?'on':''}" data-act="optdog" data-v="${v}">${n}</button>`).join('')}</span></div>
   <div class="toggle" data-act="optfriends" role="switch" aria-checked="${O.friends!==false}"><span>Друзья бегут рядом с котом</span><span class="sw2 ${O.friends!==false?'on':''}"></span></div>
-  <p class="sub">Лёгкий пёс бегает медленнее и не отнимает сердца.</p>`}
+  <p class="sub">Лёгкий пёс бегает медленнее и не отнимает сердца.</p>
+  <h3 style="margin-top:16px">Графика и удобство</h3>
+  <div class="kv"><span>Качество графики</span><span class="seg">${[['auto','Авто'],['high','Высокое'],['low','Низкое']].map(([v,n])=>`<button class="${(O.quality||'auto')===v?'on':''}" data-act="optquality" data-v="${v}">${n}</button>`).join('')}</span></div>
+  <div class="toggle" data-act="optshake" role="switch" aria-checked="${O.shake!==false}"><span>Тряска камеры</span><span class="sw2 ${O.shake!==false?'on':''}"></span></div>
+  <div class="toggle" data-act="optsoft" role="switch" aria-checked="${O.softFx===true}"><span>Мягкие вспышки</span><span class="sw2 ${O.softFx===true?'on':''}"></span></div>
+  <p class="sub">В режиме «Авто» игра сама снизит графику, если телефон не тянет.</p>`}
 U.optRows=optRows;
 U.refreshPane=function(){const p=$('pane');if(!p){U.hub();return}U.hub()};
 U.setTab=t=>{tab=t;U.hub()};
@@ -398,7 +403,7 @@ let bannerT;
 U.banner=function(h,p=''){const b=$('banner');$('bannerH').textContent=h;$('bannerP').textContent=p;b.className='banner';void b.offsetWidth;b.className='banner on';clearTimeout(bannerT);bannerT=setTimeout(()=>b.className='banner',2300)};
 let toastT;
 U.toast=function(t,html){const el=$('toast');if(html)el.innerHTML=html+' '+esc(t);else el.textContent=t;el.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('on'),2200)};
-U.flash=function(white){const f=$('flash');f.className='flash'+(white?' w':'');f.style.transition='none';f.style.opacity=white?.5:.35;requestAnimationFrame(()=>{f.style.transition='opacity .35s';f.style.opacity=0})};
+U.flash=function(white){const f=$('flash');const soft=K.app&&K.app.save&&K.app.save.opts&&K.app.save.opts.softFx===true;f.className='flash'+(white?' w':'');f.style.transition='none';f.style.opacity=(white?.5:.35)*(soft?.35:1);requestAnimationFrame(()=>{f.style.transition='opacity .35s';f.style.opacity=0})};
 U.bossBar=function(B){const bb=$('bossbar');if(!B){bb.hidden=true;return}bb.hidden=false;$('bossHp').style.width=(Math.max(0,B.hp)/B.maxHp*100)+'%'};
 U.onEvent=function(e){
   const G=K.G;

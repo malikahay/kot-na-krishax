@@ -8,10 +8,10 @@ const ALL=K.FRIENDS.map(f=>f.abil);
 
 /* ---------- сохранение ---------- */
 const SAVE_KEY='kot-save-v2';
-function defaults(){return {ver:3,opts:{dog:'normal',friends:true},wallet:0,levels:{},friends:[],owned:[],skin:{color:'ginger',hat:'none',tail:'normal'},daily:{},endless:{dist:0,score:0},ghosts:{},seenIntro:false,king:false}}
+function defaults(){return {ver:3,opts:{dog:'normal',friends:true,quality:'auto',shake:true,softFx:false},wallet:0,levels:{},friends:[],owned:[],skin:{color:'ginger',hat:'none',tail:'normal'},daily:{},endless:{dist:0,score:0},ghosts:{},seenIntro:false,king:false}}
 let S;
 try{S=Object.assign(defaults(),JSON.parse(localStorage.getItem(SAVE_KEY)||'{}'))}catch(e){S=defaults()}
-if((S.ver||1)<3){const M=K.LEVEL_MIGRATE,mv=o=>{const n={};for(const k in o)n[M[k]||k]=o[k];return n};S.levels=mv(S.levels);S.ghosts=mv(S.ghosts||{});if(S.levels['1-1'])S.levels['1-0']=S.levels['1-0']||{stars:[true,false,false],time:0,score:0,fish:false};delete S.mapPos;S.ver=3;try{localStorage.setItem(SAVE_KEY,JSON.stringify(S))}catch(e){}}
+if(K.migrateSave(S))persist();
 app.save=S;
 function persist(){try{localStorage.setItem(SAVE_KEY,JSON.stringify(S))}catch(e){
   // при переполнении хранилища выкидываем призраков
@@ -106,6 +106,8 @@ function finishRun(won){
   }
   S.wallet+=earned;persist();
   UI.hudShow(false);
+  if(mode==='daily')ysdkSubmit('dailyScore',G.score);
+  else{ysdkSubmit('endlessScore',G.score);ysdkSubmit('endlessDist',G.distance)}
   UI.runResults({mode,title:won?(mode==='daily'?'Испытание пройдено!':'Вы добежали до конца ночи!'):'Забег окончен',time,score:G.score,dist:mode==='endless'?G.distance:undefined,best,newBest,earned});
 }
 
@@ -128,6 +130,13 @@ function drain(){
 }
 
 /* ---------- действия интерфейса ---------- */
+let qLevel='high';
+function applyQuality(){
+  const q=(S.opts&&S.opts.quality)||'auto';
+  qLevel=q==='low'?'low':q==='high'?'high':(R.lowPower()?'med':'high');
+  if(R.setQuality)R.setQuality(qLevel);
+}
+function applyFx(){if(R.setFx)R.setFx({shake:!S.opts||S.opts.shake!==false})}
 app.act=function(a,d){
   switch(a){
     case 'enter':S.seenIntro=true;persist();UI.fadeTo(()=>app.toHub('map'));break;
@@ -150,6 +159,9 @@ app.act=function(a,d){
       else A.sfxPlay('deny');break}
     case 'optdog':S.opts=S.opts||{};S.opts.dog=d.v;persist();if(G.chase&&cur){if(d.v==='off'){G.chase=null;R.dropChaser()}else{G.chase.easy=d.v==='easy'}}if(G.state==='pause')UI.pause();else UI.hub();UI.toast(d.v==='off'?'Пёс выключен — с нового уровня или перезапуска его не будет':d.v==='easy'?'Пёс теперь лёгкий':'Пёс обычный');break;
     case 'optfriends':S.opts=S.opts||{};S.opts.friends=S.opts.friends===false;persist();R.setFollowers(S.opts.friends&&cur&&!G.L.arena?S.friends.slice(-3):[]);if(G.state==='pause')UI.pause();else UI.hub();break;
+    case 'optquality':S.opts=S.opts||{};S.opts.quality=d.v;persist();applyQuality();if(G.state==='pause')UI.pause();else UI.hub();UI.toast('Качество графики: '+(d.v==='auto'?'авто':d.v==='low'?'низкое':'высокое'));break;
+    case 'optshake':S.opts=S.opts||{};S.opts.shake=S.opts.shake===false;persist();applyFx();if(G.state==='pause')UI.pause();else UI.hub();break;
+    case 'optsoft':S.opts=S.opts||{};S.opts.softFx=!(S.opts.softFx===true);persist();if(G.state==='pause')UI.pause();else UI.hub();break;
     case 'music':A.toggleMusic();if(G.state==='pause')UI.pause();else UI.hub();break;
     case 'sfx':A.toggleSfx();if(G.state==='pause')UI.pause();else UI.hub();break;
     case 'daily':UI.fadeTo(()=>app.playDaily());break;
@@ -199,6 +211,10 @@ function haptic(kind){
 /* ---------- Яндекс Игры: SDK подключается, только когда игра открыта на их площадке ---------- */
 let ysdk=null;
 app.platformGameplay=function(on){try{const g=ysdk&&ysdk.features&&ysdk.features.GameplayAPI;if(g)on?g.start():g.stop()}catch(e){}};
+/* Таблицы лидеров: имена 'dailyScore', 'endlessScore', 'endlessDist' заводятся в консоли Яндекс Игр.
+   Если их нет или игра не на Яндексе — вызов молча игнорируется. */
+function ysdkSubmit(name,value){try{if(!ysdk||!ysdk.getLeaderboards||!(value>0))return;ysdk.getLeaderboards().then(lb=>lb.setLeaderboardScore(name,Math.floor(value))).catch(()=>{})}catch(e){}}
+app.lbSubmit=ysdkSubmit;
 if(/yandex|playhop/.test(location.hostname)||/[?&]yandex/.test(location.search)){
   const s=document.createElement('script');s.src='/sdk.js';
   s.onload=()=>{window.YaGames&&YaGames.init().then(sdk=>{ysdk=sdk;try{sdk.features.LoadingAPI&&sdk.features.LoadingAPI.ready()}catch(e){}}).catch(()=>{})};
@@ -222,7 +238,7 @@ addEventListener('keydown',e=>{
 });
 addEventListener('keyup',e=>{const k=KEYS[e.code];if(k)inp[k]=false});
 addEventListener('blur',()=>{inp.left=inp.right=inp.jump=inp.dash=inp.paw=inp.trap=false});
-document.addEventListener('visibilitychange',()=>{if(document.hidden&&G.state==='play'&&cur)pause()});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){A.suspend&&A.suspend();if(G.state==='play'&&cur)pause()}else A.resume&&A.resume()});
 addEventListener('pointerdown',()=>A.unlock(),{capture:true});
 [['tL','left'],['tR','right'],['tJ','jump'],['tDash','dash'],['tPaw','paw'],['tTrap','trap']].forEach(([id,k])=>{
   const b=$(id);
@@ -245,9 +261,20 @@ function pollPad(){
 }
 
 /* ---------- цикл ---------- */
-let last=performance.now(),acc=0;
+let last=performance.now(),acc=0,fpsAvg=60,fpsT=0;
 function loop(now){
   const dt=Math.min(.1,(now-last)/1000);last=now;
+  if(dt>0)fpsAvg=fpsAvg*.96+(1/dt)*.04;
+  fpsT+=dt;
+  // авто-снижение качества: если fps держится ниже 42, жертвуем графикой ради плавности
+  if(fpsT>3){
+    fpsT=0;
+    if(((S.opts&&S.opts.quality)||'auto')==='auto'&&G.state==='play'&&fpsAvg<42&&qLevel!=='low'){
+      qLevel=qLevel==='high'?'med':'low';
+      if(R.setQuality)R.setQuality(qLevel);
+      UI.toast('Графика снижена ради плавности');
+    }
+  }
   pollPad();
   if(G.state==='play'){acc+=dt;while(acc>=1/60){K.step();drain();acc-=1/60;if(G.state!=='play'){acc=0;break}}}else acc=0;
   drain();
@@ -260,6 +287,7 @@ function loop(now){
 if(!window.THREE){$('screen').innerHTML='<div class="card"><h2>Не загрузилось</h2><p>Не удалось загрузить 3D-движок. Обновите страницу.</p></div>';return}
 try{R.init($('c'))}catch(e){$('screen').innerHTML='<div class="card"><h2>Нет 3D</h2><p>Этот браузер не поддерживает WebGL. Попробуйте Chrome, Edge, Safari или Firefox.</p></div>';return}
 R.setSkin(S.skin);
+applyQuality();applyFx();
 app.toHub();UI.title();
 requestAnimationFrame(loop);
 })(window.KOT=window.KOT||{});

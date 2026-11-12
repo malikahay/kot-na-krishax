@@ -24,6 +24,9 @@ A.unlock=function(){
 };
 A.toggleMusic=function(){A.music=!A.music;if(musG)musG.gain.setTargetAtTime(A.music?.32:0,ctx.currentTime,.1);save();return A.music};
 A.toggleSfx=function(){A.sfx=!A.sfx;if(sfxG)sfxG.gain.setTargetAtTime(A.sfx?.55:0,ctx.currentTime,.05);save();return A.sfx};
+/* Батарея: во свёрнутой вкладке звук не нужен */
+A.suspend=function(){try{if(ctx&&ctx.state==='running')ctx.suspend()}catch(e){}};
+A.resume=function(){try{if(ctx&&ctx.state==='suspended'&&!document.hidden)ctx.resume()}catch(e){}};
 
 /* ---------- примитивы ---------- */
 const now=()=>ctx.currentTime;
